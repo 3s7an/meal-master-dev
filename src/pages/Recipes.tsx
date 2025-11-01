@@ -137,17 +137,21 @@ const Recipes = () => {
         </div>
       ) : filteredRecipes.length === 0 ? (
         <Card className="text-center py-12">
-          <CardContent>
-            <p className="text-muted-foreground mb-4">
-              {searchTerm || selectedCategory
-                ? "Nenašli sa žiadne recepty"
-                : "Zatiaľ nemáte žiadne recepty"}
-            </p>
-            {!searchTerm && !selectedCategory && (
-              <Button onClick={handleAddNew}>
-                <Plus className="w-4 h-4 mr-2" />
-                Pridať prvý recept
-              </Button>
+          <CardContent className="pt-6">
+            {searchTerm || selectedCategory ? (
+              <p className="text-muted-foreground mb-4">
+                Nenašli sa žiadne recepty zodpovedajúce filtrom.
+              </p>
+            ) : (
+              <>
+                <p className="text-muted-foreground mb-4">
+                  Začnite pridávaním svojich obľúbených receptov
+                </p>
+                <Button onClick={handleAddNew}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Pridať prvý recept
+                </Button>
+              </>
             )}
           </CardContent>
         </Card>

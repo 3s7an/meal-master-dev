@@ -96,7 +96,15 @@ const RecipeDialog = ({ open, onOpenChange, recipe, onSuccess }: RecipeDialogPro
     setLoading(true);
 
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!user) {
+      toast({
+        title: "Chyba",
+        description: "Musíte byť prihlásený aby ste mohli vytvoriť recept.",
+        variant: "destructive",
+      });
+      setLoading(false);
+      return;
+    }
 
     const recipeData = {
       user_id: user.id,
