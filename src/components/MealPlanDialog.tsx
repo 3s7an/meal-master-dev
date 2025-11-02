@@ -9,6 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Trash2, Plus, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { addDays, format } from "date-fns";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface MealPlan {
   id: string;
@@ -17,7 +18,17 @@ interface MealPlan {
   meals_per_day: number;
   start_date: string;
   plan_data: any;
+  meal_types?: string[];
 }
+
+const MEAL_TYPE_OPTIONS = [
+  { id: "ranajky", label: "Raňajky" },
+  { id: "desiata", label: "Desiata" },
+  { id: "polievka", label: "Polievka" },
+  { id: "hlavne_jedlo", label: "Hlavné jedlo" },
+  { id: "dezert", label: "Dezert" },
+  { id: "vecera", label: "Večera" },
+];
 
 interface Recipe {
   id: string;
@@ -39,9 +50,9 @@ const MealPlanDialog = ({ open, onOpenChange, plan, onSuccess }: MealPlanDialogP
   const [formData, setFormData] = useState({
     name: "",
     plan_type: "weekly",
-    meals_per_day: "3",
     start_date: new Date().toISOString().split("T")[0],
   });
+  const [selectedMealTypes, setSelectedMealTypes] = useState<string[]>(["ranajky", "hlavne_jedlo", "vecera"]);
   const [planData, setPlanData] = useState<any>({});
 
   useEffect(() => {
@@ -51,9 +62,9 @@ const MealPlanDialog = ({ open, onOpenChange, plan, onSuccess }: MealPlanDialogP
         setFormData({
           name: plan.name,
           plan_type: plan.plan_type,
-          meals_per_day: plan.meals_per_day.toString(),
           start_date: plan.start_date,
         });
+        setSelectedMealTypes(plan.meal_types || ["ranajky", "hlavne_jedlo", "vecera"]);
         setPlanData(plan.plan_data || {});
       } else {
         resetForm();
@@ -65,9 +76,9 @@ const MealPlanDialog = ({ open, onOpenChange, plan, onSuccess }: MealPlanDialogP
     setFormData({
       name: "",
       plan_type: "weekly",
-      meals_per_day: "3",
       start_date: new Date().toISOString().split("T")[0],
     });
+    setSelectedMealTypes(["ranajky", "hlavne_jedlo", "vecera"]);
     setPlanData({});
   };
 
@@ -98,9 +109,9 @@ const MealPlanDialog = ({ open, onOpenChange, plan, onSuccess }: MealPlanDialogP
       user_id: user.id,
       name: formData.name,
       plan_type: formData.plan_type,
-      meals_per_day: parseInt(formData.meals_per_day),
+      meals_per_day: selectedMealTypes.length,
       start_date: formData.start_date,
-      plan_data: planData,
+      plan_data: { ...planData, meal_types: selectedMealTypes },
     };
 
     let error;
@@ -159,38 +170,36 @@ const MealPlanDialog = ({ open, onOpenChange, plan, onSuccess }: MealPlanDialogP
     return formData.plan_type === "weekly" ? 7 : 30;
   };
 
-  const getMealsPerDay = () => {
-    return parseInt(formData.meals_per_day);
+  const getActiveMealTypes = () => {
+    return selectedMealTypes;
   };
 
-  const setMealForDay = (day: number, mealIndex: number, recipeId: string | null) => {
-    const key = `day_${day}_meal_${mealIndex}`;
+  const setMealForDay = (day: number, mealType: string, recipeId: string | null) => {
+    const key = `day_${day}_${mealType}`;
     setPlanData((prev: any) => ({
       ...prev,
       [key]: recipeId,
     }));
   };
 
-  const getMealForDay = (day: number, mealIndex: number): string => {
-    const key = `day_${day}_meal_${mealIndex}`;
+  const getMealForDay = (day: number, mealType: string): string => {
+    const key = `day_${day}_${mealType}`;
     return planData[key] || "none";
   };
 
-  const setMealForMultipleDays = (startDay: number, endDay: number, mealIndex: number, recipeId: string | null) => {
-    const newPlanData = { ...planData };
-    for (let day = startDay; day <= endDay; day++) {
-      const key = `day_${day}_meal_${mealIndex}`;
-      newPlanData[key] = recipeId;
-    }
-    setPlanData(newPlanData);
+  const toggleMealType = (mealTypeId: string) => {
+    setSelectedMealTypes(prev => 
+      prev.includes(mealTypeId)
+        ? prev.filter(id => id !== mealTypeId)
+        : [...prev, mealTypeId]
+    );
   };
 
   const exportMealPlan = () => {
     if (!plan) return;
 
     const daysCount = getDaysCount();
-    const mealsPerDay = getMealsPerDay();
-    const mealLabels = ["Raňajky", "Obed", "Večera", "Snack"];
+    const activeMealTypes = getActiveMealTypes();
     const startDate = new Date(formData.start_date);
 
     let exportText = `${formData.name}\n`;
@@ -205,14 +214,15 @@ const MealPlanDialog = ({ open, onOpenChange, plan, onSuccess }: MealPlanDialogP
       exportText += `Deň ${day} - ${format(currentDate, "dd.MM.yyyy")} (${dayName})\n`;
       exportText += `${"-".repeat(60)}\n`;
 
-      for (let mealIndex = 0; mealIndex < mealsPerDay; mealIndex++) {
-        const mealLabel = mealLabels[mealIndex] || `Jedlo ${mealIndex + 1}`;
-        const recipeId = getMealForDay(day, mealIndex);
+      activeMealTypes.forEach(mealType => {
+        const mealOption = MEAL_TYPE_OPTIONS.find(opt => opt.id === mealType);
+        const mealLabel = mealOption?.label || mealType;
+        const recipeId = getMealForDay(day, mealType);
         const recipe = recipes.find(r => r.id === recipeId);
         const recipeName = recipe ? recipe.name : "Nenaplánované";
 
         exportText += `  ${mealLabel}: ${recipeName}\n`;
-      }
+      });
 
       exportText += `\n`;
     }
@@ -235,45 +245,47 @@ const MealPlanDialog = ({ open, onOpenChange, plan, onSuccess }: MealPlanDialogP
     if (!plan) return null;
 
     const daysCount = getDaysCount();
-    const mealsPerDay = getMealsPerDay();
-    const mealLabels = ["Raňajky", "Obed", "Večera", "Snack"];
+    const activeMealTypes = getActiveMealTypes();
 
     return (
       <div className="space-y-4">
         <h3 className="font-semibold">Plánovanie jedál</h3>
         <div className="space-y-3">
-          {Array.from({ length: mealsPerDay }).map((_, mealIndex) => (
-            <Card key={mealIndex}>
-              <CardContent className="p-4">
-                <Label className="mb-2 block font-medium">
-                  {mealLabels[mealIndex] || `Jedlo ${mealIndex + 1}`}
-                </Label>
-                <div className="grid grid-cols-7 gap-2">
-                  {Array.from({ length: daysCount }).map((_, dayIndex) => (
-                    <div key={dayIndex} className="space-y-1">
-                      <Label className="text-xs">{dayIndex + 1}</Label>
-                      <Select
-                        value={getMealForDay(dayIndex + 1, mealIndex)}
-                        onValueChange={(value) => setMealForDay(dayIndex + 1, mealIndex, value === "none" ? null : value)}
-                      >
-                        <SelectTrigger className="h-8 text-xs">
-                          <SelectValue placeholder="-" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">Žiadne</SelectItem>
-                          {recipes.map((recipe) => (
-                            <SelectItem key={recipe.id} value={recipe.id}>
-                              {recipe.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+          {activeMealTypes.map((mealType) => {
+            const mealOption = MEAL_TYPE_OPTIONS.find(opt => opt.id === mealType);
+            return (
+              <Card key={mealType}>
+                <CardContent className="p-4">
+                  <Label className="mb-2 block font-medium">
+                    {mealOption?.label || mealType}
+                  </Label>
+                  <div className="grid grid-cols-7 gap-2">
+                    {Array.from({ length: daysCount }).map((_, dayIndex) => (
+                      <div key={dayIndex} className="space-y-1">
+                        <Label className="text-xs">{dayIndex + 1}</Label>
+                        <Select
+                          value={getMealForDay(dayIndex + 1, mealType)}
+                          onValueChange={(value) => setMealForDay(dayIndex + 1, mealType, value === "none" ? null : value)}
+                        >
+                          <SelectTrigger className="h-8 text-xs">
+                            <SelectValue placeholder="-" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">Žiadne</SelectItem>
+                            {recipes.map((recipe) => (
+                              <SelectItem key={recipe.id} value={recipe.id}>
+                                {recipe.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       </div>
     );
@@ -300,42 +312,42 @@ const MealPlanDialog = ({ open, onOpenChange, plan, onSuccess }: MealPlanDialogP
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="plan_type">Typ plánu *</Label>
-              <Select
-                value={formData.plan_type}
-                onValueChange={(value) => setFormData({ ...formData, plan_type: value })}
-                disabled={!!plan}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="weekly">Týždenný (7 dní)</SelectItem>
-                  <SelectItem value="monthly">Mesačný (30 dní)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="plan_type">Typ plánu *</Label>
+            <Select
+              value={formData.plan_type}
+              onValueChange={(value) => setFormData({ ...formData, plan_type: value })}
+              disabled={!!plan}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="weekly">Týždenný (7 dní)</SelectItem>
+                <SelectItem value="monthly">Mesačný (30 dní)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="meals_per_day">Jedál denne *</Label>
-              <Select
-                value={formData.meals_per_day}
-                onValueChange={(value) => setFormData({ ...formData, meals_per_day: value })}
-                disabled={!!plan}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="1">1 jedlo</SelectItem>
-                  <SelectItem value="2">2 jedlá</SelectItem>
-                  <SelectItem value="3">3 jedlá</SelectItem>
-                  <SelectItem value="4">4 jedlá</SelectItem>
-                  <SelectItem value="5">5 jediel</SelectItem>
-                </SelectContent>
-              </Select>
+          <div className="space-y-3">
+            <Label>Typy jedál *</Label>
+            <div className="grid grid-cols-2 gap-3">
+              {MEAL_TYPE_OPTIONS.map((mealType) => (
+                <div key={mealType.id} className="flex items-center space-x-2">
+                  <Checkbox
+                    id={mealType.id}
+                    checked={selectedMealTypes.includes(mealType.id)}
+                    onCheckedChange={() => toggleMealType(mealType.id)}
+                    disabled={!!plan}
+                  />
+                  <Label
+                    htmlFor={mealType.id}
+                    className="text-sm font-normal cursor-pointer"
+                  >
+                    {mealType.label}
+                  </Label>
+                </div>
+              ))}
             </div>
           </div>
 
