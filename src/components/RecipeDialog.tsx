@@ -111,7 +111,7 @@ const RecipeDialog = ({ open, onOpenChange, recipe, onSuccess }: RecipeDialogPro
       name: formData.name,
       description: formData.description,
       category: formData.category,
-      ingredients: ingredients.filter(i => i.name && i.quantity) as any,
+      ingredients: ingredients.filter(i => i.name) as any,
       instructions: formData.instructions,
       calories: formData.calories ? parseInt(formData.calories) : null,
       notes: formData.notes,
@@ -177,12 +177,12 @@ const RecipeDialog = ({ open, onOpenChange, recipe, onSuccess }: RecipeDialogPro
     if (!user) return;
 
     const items = ingredients
-      .filter(i => i.name && i.quantity)
+      .filter(i => i.name)
       .map(i => ({
         user_id: user.id,
         item_name: i.name,
-        quantity: i.quantity,
-        unit: i.unit,
+        quantity: i.quantity || null,
+        unit: i.unit || null,
         recipe_id: recipe.id,
         is_checked: false,
       }));
@@ -309,13 +309,12 @@ const RecipeDialog = ({ open, onOpenChange, recipe, onSuccess }: RecipeDialogPro
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="instructions">Postup prípravy *</Label>
+            <Label htmlFor="instructions">Postup prípravy</Label>
             <Textarea
               id="instructions"
               value={formData.instructions}
               onChange={(e) => setFormData({ ...formData, instructions: e.target.value })}
               rows={4}
-              required
             />
           </div>
 
