@@ -6,8 +6,9 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
-import { Trash2, Plus } from "lucide-react";
+import { Trash2, Plus, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { addDays, format } from "date-fns";
 
 interface MealPlan {
   id: string;
@@ -184,6 +185,52 @@ const MealPlanDialog = ({ open, onOpenChange, plan, onSuccess }: MealPlanDialogP
     setPlanData(newPlanData);
   };
 
+  const exportMealPlan = () => {
+    if (!plan) return;
+
+    const daysCount = getDaysCount();
+    const mealsPerDay = getMealsPerDay();
+    const mealLabels = ["Raňajky", "Obed", "Večera", "Snack"];
+    const startDate = new Date(formData.start_date);
+
+    let exportText = `${formData.name}\n`;
+    exportText += `${formData.plan_type === "weekly" ? "Týždenný plán" : "Mesačný plán"}\n`;
+    exportText += `Obdobie: ${format(startDate, "dd.MM.yyyy")} - ${format(addDays(startDate, daysCount - 1), "dd.MM.yyyy")}\n`;
+    exportText += `\n${"=".repeat(60)}\n\n`;
+
+    for (let day = 1; day <= daysCount; day++) {
+      const currentDate = addDays(startDate, day - 1);
+      const dayName = format(currentDate, "EEEE", { locale: undefined });
+      
+      exportText += `Deň ${day} - ${format(currentDate, "dd.MM.yyyy")} (${dayName})\n`;
+      exportText += `${"-".repeat(60)}\n`;
+
+      for (let mealIndex = 0; mealIndex < mealsPerDay; mealIndex++) {
+        const mealLabel = mealLabels[mealIndex] || `Jedlo ${mealIndex + 1}`;
+        const recipeId = getMealForDay(day, mealIndex);
+        const recipe = recipes.find(r => r.id === recipeId);
+        const recipeName = recipe ? recipe.name : "Nenaplánované";
+
+        exportText += `  ${mealLabel}: ${recipeName}\n`;
+      }
+
+      exportText += `\n`;
+    }
+
+    const blob = new Blob([exportText], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `jedalnicek-${formData.name.toLowerCase().replace(/\s+/g, "-")}-${format(new Date(), "yyyy-MM-dd")}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    toast({
+      title: "Export úspešný",
+      description: "Jedálniček bol exportovaný do súboru.",
+    });
+  };
+
   const renderMealPlan = () => {
     if (!plan) return null;
 
@@ -306,17 +353,28 @@ const MealPlanDialog = ({ open, onOpenChange, plan, onSuccess }: MealPlanDialogP
           {plan && renderMealPlan()}
 
           <div className="flex gap-2 justify-between">
-            <div>
+            <div className="flex gap-2">
               {plan && (
-                <Button
-                  type="button"
-                  variant="destructive"
-                  onClick={handleDelete}
-                  disabled={loading}
-                >
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Odstrániť
-                </Button>
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={exportMealPlan}
+                    disabled={loading}
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    Exportovať
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    onClick={handleDelete}
+                    disabled={loading}
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Odstrániť
+                  </Button>
+                </>
               )}
             </div>
             <Button type="submit" disabled={loading}>
