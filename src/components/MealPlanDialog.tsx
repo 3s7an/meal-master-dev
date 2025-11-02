@@ -172,7 +172,7 @@ const MealPlanDialog = ({ open, onOpenChange, plan, onSuccess }: MealPlanDialogP
 
   const getMealForDay = (day: number, mealIndex: number): string => {
     const key = `day_${day}_meal_${mealIndex}`;
-    return planData[key] || "";
+    return planData[key] || "none";
   };
 
   const setMealForMultipleDays = (startDay: number, endDay: number, mealIndex: number, recipeId: string | null) => {
@@ -207,13 +207,13 @@ const MealPlanDialog = ({ open, onOpenChange, plan, onSuccess }: MealPlanDialogP
                       <Label className="text-xs">{dayIndex + 1}</Label>
                       <Select
                         value={getMealForDay(dayIndex + 1, mealIndex)}
-                        onValueChange={(value) => setMealForDay(dayIndex + 1, mealIndex, value || null)}
+                        onValueChange={(value) => setMealForDay(dayIndex + 1, mealIndex, value === "none" ? null : value)}
                       >
                         <SelectTrigger className="h-8 text-xs">
                           <SelectValue placeholder="-" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">Žiadne</SelectItem>
+                          <SelectItem value="none">Žiadne</SelectItem>
                           {recipes.map((recipe) => (
                             <SelectItem key={recipe.id} value={recipe.id}>
                               {recipe.name}
