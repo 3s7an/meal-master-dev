@@ -125,7 +125,12 @@ const ShoppingList = () => {
   const exportList = () => {
     const text = items
       .filter(i => !i.is_checked)
-      .map(i => `${i.item_name} - ${i.quantity} ${i.unit}`)
+      .map(i => {
+        const quantityText = i.quantity !== 1 || i.unit 
+          ? `${i.quantity !== 1 ? i.quantity : ''} ${i.unit}`.trim()
+          : '';
+        return quantityText ? `${i.item_name} - ${quantityText}` : i.item_name;
+      })
       .join("\n");
     
     const blob = new Blob([text], { type: "text/plain" });
@@ -213,9 +218,9 @@ const ShoppingList = () => {
                 />
                 <div className={`flex-1 ${item.is_checked ? "line-through text-muted-foreground" : ""}`}>
                   <span className="font-medium">{item.item_name}</span>
-                  {(item.quantity || item.unit) && (
+                  {(item.quantity !== 1 || item.unit) && (
                     <span className="text-muted-foreground ml-2">
-                      {item.quantity} {item.unit}
+                      {item.quantity !== 1 && item.quantity} {item.unit}
                     </span>
                   )}
                 </div>
