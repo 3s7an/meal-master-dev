@@ -217,57 +217,83 @@ const MealPlanDialog = ({ open, onOpenChange, plan, onSuccess }: MealPlanDialogP
 
     const doc = new jsPDF();
     
-    // Header with primary color
-    doc.setFillColor(147, 51, 234); // primary color (purple)
+    // Header with green primary color
+    doc.setFillColor(22, 163, 74); // green primary color
     doc.rect(0, 0, 210, 40, "F");
     
-    // Title
+    // MealMaster Logo/Brand
     doc.setTextColor(255, 255, 255);
-    doc.setFontSize(20);
+    doc.setFontSize(24);
     doc.setFont("helvetica", "bold");
-    doc.text(formData.name, 105, 15, { align: "center" });
+    doc.text("MealMaster", 105, 13, { align: "center" });
+    
+    // Title
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+    doc.text(formData.name, 105, 22, { align: "center" });
     
     // Subtitle
-    doc.setFontSize(12);
+    doc.setFontSize(11);
     doc.setFont("helvetica", "normal");
     doc.text(
-      formData.plan_type === "weekly" ? "Týždenný plán" : "Mesačný plán",
+      formData.plan_type === "weekly" ? "Weekly Plan" : "Monthly Plan",
       105,
-      25,
+      29,
       { align: "center" }
     );
     
     // Period
-    doc.setFontSize(10);
+    doc.setFontSize(9);
     doc.text(
-      `Obdobie: ${format(startDate, "dd.MM.yyyy")} - ${format(addDays(startDate, daysCount - 1), "dd.MM.yyyy")}`,
+      `Period: ${format(startDate, "dd.MM.yyyy")} - ${format(addDays(startDate, daysCount - 1), "dd.MM.yyyy")}`,
       105,
-      33,
+      35,
       { align: "center" }
     );
 
     // Prepare table data
     const tableData: any[] = [];
     
+    // English day names mapping
+    const dayNames: Record<string, string> = {
+      "pondelok": "Monday",
+      "utorok": "Tuesday",
+      "streda": "Wednesday",
+      "štvrtok": "Thursday",
+      "piatok": "Friday",
+      "sobota": "Saturday",
+      "nedeľa": "Sunday"
+    };
+    
+    // English meal type names
+    const mealTypeLabels: Record<string, string> = {
+      "ranajky": "Breakfast",
+      "desiata": "Snack",
+      "polievka": "Soup",
+      "hlavne_jedlo": "Main Course",
+      "dezert": "Dessert",
+      "vecera": "Dinner"
+    };
+    
     for (let day = 1; day <= daysCount; day++) {
       const currentDate = addDays(startDate, day - 1);
-      const dayName = format(currentDate, "EEEE", { locale: sk });
+      const dayNameSk = format(currentDate, "EEEE", { locale: sk }).toLowerCase();
+      const dayNameEn = dayNames[dayNameSk] || format(currentDate, "EEEE");
       const dateStr = format(currentDate, "dd.MM.yyyy");
       
       const meals: string[] = [];
       activeMealTypes.forEach(mealType => {
-        const mealOption = MEAL_TYPE_OPTIONS.find(opt => opt.id === mealType);
-        const mealLabel = mealOption?.label || mealType;
+        const mealLabel = mealTypeLabels[mealType] || mealType;
         const recipeId = getMealForDay(day, mealType);
         const recipe = recipes.find(r => r.id === recipeId);
-        const recipeName = recipe ? recipe.name : "Nenaplánované";
+        const recipeName = recipe ? recipe.name : "Not Planned";
         
         meals.push(`${mealLabel}: ${recipeName}`);
       });
       
       tableData.push([
         dateStr,
-        dayName.charAt(0).toUpperCase() + dayName.slice(1),
+        dayNameEn,
         meals.join("\n")
       ]);
     }
@@ -275,11 +301,11 @@ const MealPlanDialog = ({ open, onOpenChange, plan, onSuccess }: MealPlanDialogP
     // Add table
     autoTable(doc, {
       startY: 45,
-      head: [["Dátum", "Deň", "Jedlá"]],
+      head: [["Date", "Day", "Foods"]],
       body: tableData,
       theme: "grid",
       headStyles: {
-        fillColor: [147, 51, 234], // primary color
+        fillColor: [22, 163, 74], // green primary color
         textColor: [255, 255, 255],
         fontSize: 11,
         fontStyle: "bold",
@@ -306,7 +332,7 @@ const MealPlanDialog = ({ open, onOpenChange, plan, onSuccess }: MealPlanDialogP
       doc.setFontSize(8);
       doc.setTextColor(100);
       doc.text(
-        `Strana ${i} z ${pageCount}`,
+        `Page ${i} of ${pageCount}`,
         105,
         doc.internal.pageSize.height - 10,
         { align: "center" }
@@ -315,12 +341,12 @@ const MealPlanDialog = ({ open, onOpenChange, plan, onSuccess }: MealPlanDialogP
 
     // Save PDF
     doc.save(
-      `jedalnicek-${formData.name.toLowerCase().replace(/\s+/g, "-")}-${format(new Date(), "yyyy-MM-dd")}.pdf`
+      `mealplan-${formData.name.toLowerCase().replace(/\s+/g, "-")}-${format(new Date(), "yyyy-MM-dd")}.pdf`
     );
 
     toast({
-      title: "Export úspešný",
-      description: "Jedálniček bol exportovaný do PDF.",
+      title: "Export successful",
+      description: "Meal plan has been exported to PDF.",
     });
   };
 
