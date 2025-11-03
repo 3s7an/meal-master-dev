@@ -92,6 +92,16 @@ const MealPlanDialog = ({ open, onOpenChange, plan, onSuccess }: MealPlanDialogP
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (selectedMealTypes.length === 0) {
+      toast({
+        title: "Chyba",
+        description: "Musíte vybrať aspoň jeden typ jedla.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setLoading(true);
 
     const { data: { user } } = await supabase.auth.getUser();
