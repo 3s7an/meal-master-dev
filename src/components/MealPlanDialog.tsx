@@ -64,7 +64,7 @@ const MealPlanDialog = ({ open, onOpenChange, plan, onSuccess }: MealPlanDialogP
           plan_type: plan.plan_type,
           start_date: plan.start_date,
         });
-        setSelectedMealTypes(plan.meal_types || ["ranajky", "hlavne_jedlo", "vecera"]);
+        setSelectedMealTypes(plan.plan_data?.meal_types || ["ranajky", "hlavne_jedlo", "vecera"]);
         setPlanData(plan.plan_data || {});
       } else {
         resetForm();
