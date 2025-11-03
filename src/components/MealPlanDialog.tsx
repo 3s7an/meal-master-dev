@@ -9,7 +9,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Trash2, Plus, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { addDays, format } from "date-fns";
+import { sk } from "date-fns/locale";
 import { Checkbox } from "@/components/ui/checkbox";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 interface MealPlan {
   id: string;
@@ -212,42 +215,112 @@ const MealPlanDialog = ({ open, onOpenChange, plan, onSuccess }: MealPlanDialogP
     const activeMealTypes = getActiveMealTypes();
     const startDate = new Date(formData.start_date);
 
-    let exportText = `${formData.name}\n`;
-    exportText += `${formData.plan_type === "weekly" ? "Týždenný plán" : "Mesačný plán"}\n`;
-    exportText += `Obdobie: ${format(startDate, "dd.MM.yyyy")} - ${format(addDays(startDate, daysCount - 1), "dd.MM.yyyy")}\n`;
-    exportText += `\n${"=".repeat(60)}\n\n`;
+    const doc = new jsPDF();
+    
+    // Header with primary color
+    doc.setFillColor(147, 51, 234); // primary color (purple)
+    doc.rect(0, 0, 210, 40, "F");
+    
+    // Title
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(20);
+    doc.setFont("helvetica", "bold");
+    doc.text(formData.name, 105, 15, { align: "center" });
+    
+    // Subtitle
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "normal");
+    doc.text(
+      formData.plan_type === "weekly" ? "Týždenný plán" : "Mesačný plán",
+      105,
+      25,
+      { align: "center" }
+    );
+    
+    // Period
+    doc.setFontSize(10);
+    doc.text(
+      `Obdobie: ${format(startDate, "dd.MM.yyyy")} - ${format(addDays(startDate, daysCount - 1), "dd.MM.yyyy")}`,
+      105,
+      33,
+      { align: "center" }
+    );
 
+    // Prepare table data
+    const tableData: any[] = [];
+    
     for (let day = 1; day <= daysCount; day++) {
       const currentDate = addDays(startDate, day - 1);
-      const dayName = format(currentDate, "EEEE", { locale: undefined });
+      const dayName = format(currentDate, "EEEE", { locale: sk });
+      const dateStr = format(currentDate, "dd.MM.yyyy");
       
-      exportText += `Deň ${day} - ${format(currentDate, "dd.MM.yyyy")} (${dayName})\n`;
-      exportText += `${"-".repeat(60)}\n`;
-
+      const meals: string[] = [];
       activeMealTypes.forEach(mealType => {
         const mealOption = MEAL_TYPE_OPTIONS.find(opt => opt.id === mealType);
         const mealLabel = mealOption?.label || mealType;
         const recipeId = getMealForDay(day, mealType);
         const recipe = recipes.find(r => r.id === recipeId);
         const recipeName = recipe ? recipe.name : "Nenaplánované";
-
-        exportText += `  ${mealLabel}: ${recipeName}\n`;
+        
+        meals.push(`${mealLabel}: ${recipeName}`);
       });
-
-      exportText += `\n`;
+      
+      tableData.push([
+        dateStr,
+        dayName.charAt(0).toUpperCase() + dayName.slice(1),
+        meals.join("\n")
+      ]);
     }
 
-    const blob = new Blob([exportText], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `jedalnicek-${formData.name.toLowerCase().replace(/\s+/g, "-")}-${format(new Date(), "yyyy-MM-dd")}.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
+    // Add table
+    autoTable(doc, {
+      startY: 45,
+      head: [["Dátum", "Deň", "Jedlá"]],
+      body: tableData,
+      theme: "grid",
+      headStyles: {
+        fillColor: [147, 51, 234], // primary color
+        textColor: [255, 255, 255],
+        fontSize: 11,
+        fontStyle: "bold",
+        halign: "center"
+      },
+      bodyStyles: {
+        fontSize: 9,
+        cellPadding: 5
+      },
+      columnStyles: {
+        0: { cellWidth: 30, halign: "center" },
+        1: { cellWidth: 35, halign: "center" },
+        2: { cellWidth: 125, halign: "left" }
+      },
+      alternateRowStyles: {
+        fillColor: [245, 245, 250]
+      }
+    });
+
+    // Footer
+    const pageCount = (doc as any).internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(100);
+      doc.text(
+        `Strana ${i} z ${pageCount}`,
+        105,
+        doc.internal.pageSize.height - 10,
+        { align: "center" }
+      );
+    }
+
+    // Save PDF
+    doc.save(
+      `jedalnicek-${formData.name.toLowerCase().replace(/\s+/g, "-")}-${format(new Date(), "yyyy-MM-dd")}.pdf`
+    );
 
     toast({
       title: "Export úspešný",
-      description: "Jedálniček bol exportovaný do súboru.",
+      description: "Jedálniček bol exportovaný do PDF.",
     });
   };
 
