@@ -275,35 +275,38 @@ const RecipeDialog = ({ open, onOpenChange, recipe, onSuccess }: RecipeDialogPro
               </Button>
             </div>
             {ingredients.map((ingredient, index) => (
-              <div key={index} className="flex gap-2">
+              <div key={index} className="flex flex-col sm:flex-row gap-2">
                 <Input
-                  placeholder="Názov"
+                  placeholder="Názov ingrediencie"
                   value={ingredient.name}
                   onChange={(e) => updateIngredient(index, "name", e.target.value)}
-                  className="flex-1"
+                  className="flex-1 min-w-0"
                 />
-                <Input
-                  placeholder="Množstvo"
-                  type="number"
-                  value={ingredient.quantity || ""}
-                  onChange={(e) => updateIngredient(index, "quantity", parseFloat(e.target.value) || 0)}
-                  className="w-24"
-                />
-                <Input
-                  placeholder="Jednotka"
-                  value={ingredient.unit}
-                  onChange={(e) => updateIngredient(index, "unit", e.target.value)}
-                  className="w-24"
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => removeIngredient(index)}
-                  disabled={ingredients.length === 1}
-                >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Mn."
+                    type="number"
+                    value={ingredient.quantity || ""}
+                    onChange={(e) => updateIngredient(index, "quantity", parseFloat(e.target.value) || 0)}
+                    className="w-16 sm:w-20"
+                  />
+                  <Input
+                    placeholder="jedn."
+                    value={ingredient.unit}
+                    onChange={(e) => updateIngredient(index, "unit", e.target.value)}
+                    className="w-16 sm:w-20"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => removeIngredient(index)}
+                    disabled={ingredients.length === 1}
+                    className="shrink-0"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
               </div>
             ))}
           </div>
