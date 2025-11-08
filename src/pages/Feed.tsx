@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Search, Heart, Plus, TrendingUp, Clock } from "lucide-react";
+import { Search, Heart, Plus, Minus, TrendingUp, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -154,7 +154,7 @@ const Feed = () => {
     }
   };
 
-  const saveRecipe = async (recipeId: string) => {
+  const toggleSaveRecipe = async (recipeId: string) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
@@ -162,10 +162,35 @@ const Feed = () => {
     if (!recipe) return;
 
     if (recipe.is_saved) {
+      const { error } = await supabase
+        .from("saved_recipes")
+        .delete()
+        .eq("recipe_id", recipeId)
+        .eq("user_id", user.id);
+
+      if (error) {
+        toast({
+          title: "Chyba",
+          description: error.message,
+          variant: "destructive",
+        });
+        return;
+      }
+
       toast({
-        title: "Info",
-        description: "Tento recept už máte uložený.",
+        title: "Recept odstránený",
+        description: "Recept bol odstránený z vašej zbierky.",
       });
+
+      setRecipes(prev =>
+        prev.map(r =>
+          r.id === recipeId ? { ...r, is_saved: false } : r
+        )
+      );
+      setSelectedRecipe(prev =>
+        prev && prev.id === recipeId ? { ...prev, is_saved: false } : prev
+      );
+
       return;
     }
 
@@ -184,7 +209,14 @@ const Feed = () => {
         title: "Recept uložený",
         description: "Recept bol pridaný do vašej zbierky.",
       });
-      fetchRecipes();
+      setRecipes(prev =>
+        prev.map(r =>
+          r.id === recipeId ? { ...r, is_saved: true } : r
+        )
+      );
+      setSelectedRecipe(prev =>
+        prev && prev.id === recipeId ? { ...prev, is_saved: true } : prev
+      );
       setIsDialogOpen(false);
     }
   };
@@ -386,12 +418,16 @@ const Feed = () => {
                   <span className="text-muted-foreground">({selectedRecipe.likes_count || 0})</span>
                 </Button>
                 <Button
-                  onClick={() => saveRecipe(selectedRecipe.id)}
-                  disabled={selectedRecipe.is_saved}
+                  onClick={() => toggleSaveRecipe(selectedRecipe.id)}
                   className="gap-2"
+                  variant={selectedRecipe.is_saved ? "destructive" : "default"}
                 >
-                  <Plus className="w-4 h-4" />
-                  {selectedRecipe.is_saved ? "Už máte uložené" : "Pridať do mojich receptov"}
+                  {selectedRecipe.is_saved ? (
+                    <Minus className="w-4 h-4" />
+                  ) : (
+                    <Plus className="w-4 h-4" />
+                  )}
+                  {selectedRecipe.is_saved ? "Odobrať z mojich receptov" : "Pridať do mojich receptov"}
                 </Button>
               </div>
             </div>

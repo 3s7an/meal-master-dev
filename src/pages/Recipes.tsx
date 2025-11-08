@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Clock, Users } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Plus, Search, Clock, Users, BookmarkMinus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import RecipeDialog from "@/components/RecipeDialog";
 
@@ -17,17 +18,30 @@ interface Recipe {
   instructions: string;
   image_url?: string;
   calories?: number;
+  notes?: string;
+  user_id?: string;
+  is_public?: boolean;
+  created_at?: string;
 }
+
+type RecipeSource = "own" | "saved";
+
+type UserRecipe = Recipe & {
+  source: RecipeSource;
+  saved_at?: string;
+};
 
 const Recipes = () => {
   const { toast } = useToast();
-  const [recipes, setRecipes] = useState<Recipe[]>([]);
-  const [filteredRecipes, setFilteredRecipes] = useState<Recipe[]>([]);
+  const [recipes, setRecipes] = useState<UserRecipe[]>([]);
+  const [filteredRecipes, setFilteredRecipes] = useState<UserRecipe[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
+  const [isSavedDialogOpen, setIsSavedDialogOpen] = useState(false);
+  const [selectedSavedRecipe, setSelectedSavedRecipe] = useState<UserRecipe | null>(null);
 
   const categories = [
     { value: "breakfast", label: "Raňajky", color: "bg-accent" },
@@ -53,20 +67,80 @@ const Recipes = () => {
       return;
     }
 
-    const { data, error } = await supabase
-      .from("recipes")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false });
+    const [
+      { data: ownData, error: ownError },
+      { data: savedData, error: savedError },
+    ] = await Promise.all([
+      supabase
+        .from("recipes")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("saved_recipes")
+        .select("id, created_at, recipes(*)")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false }),
+    ]);
 
-    if (error) {
+    if (ownError || savedError) {
       toast({
         title: "Chyba",
         description: "Nepodarilo sa načítať recepty.",
         variant: "destructive",
       });
     } else {
-      setRecipes(data || []);
+      const ownRecipes: UserRecipe[] =
+        (ownData || []).map((recipe) => ({
+          ...recipe,
+          source: "own" as const,
+        })) ?? [];
+
+      const savedRecipes: UserRecipe[] =
+        (savedData || [])
+          .map((entry: any) => {
+            if (!entry.recipes) return null;
+            return {
+              ...entry.recipes,
+              source: "saved" as RecipeSource,
+              saved_at: entry.created_at as string | undefined,
+            } as UserRecipe;
+          })
+          .filter(Boolean) as UserRecipe[];
+
+      const combinedMap = new Map<string, UserRecipe>();
+      ownRecipes.forEach((recipe) => {
+        combinedMap.set(recipe.id, recipe);
+      });
+      savedRecipes.forEach((recipe) => {
+        if (combinedMap.has(recipe.id)) {
+          const existing = combinedMap.get(recipe.id)!;
+          combinedMap.set(recipe.id, {
+            ...existing,
+            saved_at: recipe.saved_at,
+          });
+        } else {
+          combinedMap.set(recipe.id, recipe);
+        }
+      });
+
+      const getSortValue = (recipe: UserRecipe) => {
+        if (recipe.saved_at) {
+          const savedTime = Date.parse(recipe.saved_at);
+          if (!Number.isNaN(savedTime)) return savedTime;
+        }
+        if (recipe.created_at) {
+          const createdTime = Date.parse(recipe.created_at);
+          if (!Number.isNaN(createdTime)) return createdTime;
+        }
+        return 0;
+      };
+
+      const combined = Array.from(combinedMap.values()).sort(
+        (a, b) => getSortValue(b) - getSortValue(a),
+      );
+
+      setRecipes(combined);
     }
     setLoading(false);
   };
@@ -87,7 +161,74 @@ const Recipes = () => {
     setFilteredRecipes(filtered);
   };
 
-  const handleRecipeClick = (recipe: Recipe) => {
+  const handleToggleSave = async (recipeId: string) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const recipe = recipes.find((r) => r.id === recipeId);
+    if (!recipe) return;
+
+    if (recipe.source === "saved") {
+      const { error } = await supabase
+        .from("saved_recipes")
+        .delete()
+        .eq("recipe_id", recipeId)
+        .eq("user_id", user.id);
+
+      if (error) {
+        toast({
+          title: "Chyba",
+          description: error.message,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      toast({
+        title: "Recept odstránený",
+        description: "Recept bol odstránený z vašej zbierky.",
+      });
+
+      setRecipes((prev) =>
+        prev.filter((item) => !(item.id === recipeId && item.source === "saved"))
+      );
+      setFilteredRecipes((prev) =>
+        prev.filter((item) => !(item.id === recipeId && item.source === "saved"))
+      );
+      if (selectedSavedRecipe?.id === recipeId) {
+        setSelectedSavedRecipe(null);
+        setIsSavedDialogOpen(false);
+      }
+      return;
+    }
+
+    const { error } = await supabase
+      .from("saved_recipes")
+      .insert({ recipe_id: recipeId, user_id: user.id });
+
+    if (error) {
+      toast({
+        title: "Chyba",
+        description: error.message,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    toast({
+      title: "Recept uložený",
+      description: "Recept bol pridaný do vašej zbierky.",
+    });
+
+    await fetchRecipes();
+  };
+
+  const handleRecipeClick = (recipe: UserRecipe) => {
+    if (recipe.source === "saved") {
+      setSelectedSavedRecipe(recipe);
+      setIsSavedDialogOpen(true);
+      return;
+    }
     setSelectedRecipe(recipe);
     setIsDialogOpen(true);
   };
@@ -185,28 +326,49 @@ const Recipes = () => {
               <CardHeader>
                 <div className="flex items-start justify-between gap-2">
                   <CardTitle className="line-clamp-1">{recipe.name}</CardTitle>
-                  <Badge
-                    className={
-                      categories.find((c) => c.value === recipe.category)?.color
-                    }
-                  >
-                    {categories.find((c) => c.value === recipe.category)?.label}
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    {recipe.source === "saved" && (
+                      <Badge variant="secondary">Uložené</Badge>
+                    )}
+                    <Badge
+                      className={
+                        categories.find((c) => c.value === recipe.category)?.color
+                      }
+                    >
+                      {categories.find((c) => c.value === recipe.category)?.label}
+                    </Badge>
+                  </div>
                 </div>
                 <CardDescription className="line-clamp-2">
                   {recipe.description}
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                  <div className="flex items-center gap-1">
-                    <Clock className="w-4 h-4" />
-                    <span>{recipe.ingredients.length} ingrediencií</span>
-                  </div>
-                  {recipe.calories && (
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
                     <div className="flex items-center gap-1">
-                      <span>{recipe.calories} kcal</span>
+                      <Clock className="w-4 h-4" />
+                      <span>{recipe.ingredients?.length || 0} ingrediencií</span>
                     </div>
+                    {recipe.calories && (
+                      <div className="flex items-center gap-1">
+                        <span>{recipe.calories} kcal</span>
+                      </div>
+                    )}
+                  </div>
+                  {recipe.source === "saved" && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="gap-2 text-muted-foreground hover:text-destructive"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleToggleSave(recipe.id);
+                      }}
+                    >
+                      <BookmarkMinus className="w-4 h-4" />
+                      Odobrať
+                    </Button>
                   )}
                 </div>
               </CardContent>
@@ -214,6 +376,93 @@ const Recipes = () => {
           ))}
         </div>
       )}
+
+      <Dialog
+        open={isSavedDialogOpen}
+        onOpenChange={(open) => {
+          setIsSavedDialogOpen(open);
+          if (!open) {
+            setSelectedSavedRecipe(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{selectedSavedRecipe?.name}</DialogTitle>
+            {selectedSavedRecipe && (
+              <DialogDescription>
+                <div className="flex items-center gap-2">
+                  <Badge
+                    className={
+                      categories.find((c) => c.value === selectedSavedRecipe.category)?.color
+                    }
+                  >
+                    {categories.find((c) => c.value === selectedSavedRecipe.category)?.label}
+                  </Badge>
+                  <Badge variant="secondary">Uložené</Badge>
+                </div>
+              </DialogDescription>
+            )}
+          </DialogHeader>
+
+          {selectedSavedRecipe && (
+            <div className="space-y-6">
+              {selectedSavedRecipe.description && (
+                <div>
+                  <h3 className="text-sm font-semibold text-muted-foreground">Popis</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {selectedSavedRecipe.description}
+                  </p>
+                </div>
+              )}
+
+              <div>
+                <h3 className="text-sm font-semibold text-muted-foreground">
+                  Ingrediencie ({selectedSavedRecipe.ingredients?.length || 0})
+                </h3>
+                <ul className="list-disc list-inside space-y-1 mt-2">
+                  {selectedSavedRecipe.ingredients?.map((ingredient: any, idx: number) => (
+                    <li key={idx} className="text-sm">
+                      {ingredient.name}
+                      {ingredient.quantity && ingredient.quantity !== 1 ? ` - ${ingredient.quantity}` : ""}
+                      {ingredient.unit ? ` ${ingredient.unit}` : ""}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {selectedSavedRecipe.instructions && (
+                <div>
+                  <h3 className="text-sm font-semibold text-muted-foreground">Postup prípravy</h3>
+                  <p className="mt-2 whitespace-pre-line text-sm text-muted-foreground">
+                    {selectedSavedRecipe.instructions}
+                  </p>
+                </div>
+              )}
+
+              {selectedSavedRecipe.calories && (
+                <div>
+                  <h3 className="text-sm font-semibold text-muted-foreground">Kalórie</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {selectedSavedRecipe.calories} kcal
+                  </p>
+                </div>
+              )}
+
+              <div className="flex justify-end">
+                <Button
+                  variant="destructive"
+                  className="gap-2"
+                  onClick={() => handleToggleSave(selectedSavedRecipe.id)}
+                >
+                  <BookmarkMinus className="w-4 h-4" />
+                  Odobrať z uložených
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <RecipeDialog
         open={isDialogOpen}
