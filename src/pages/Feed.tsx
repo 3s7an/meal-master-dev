@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Search, Heart, Plus, Minus, TrendingUp, Clock } from "lucide-react";
+import { Search, Heart, Plus, Minus, TrendingUp, Clock, User } from "lucide-react";
+import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -24,6 +25,7 @@ interface Recipe {
   likes_count?: number;
   is_liked?: boolean;
   is_saved?: boolean;
+  author_name?: string | null;
 }
 
 const Feed = () => {
@@ -36,6 +38,7 @@ const Feed = () => {
   const [sortBy, setSortBy] = useState<"recent" | "popular">("recent");
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   const categories = [
     { value: "breakfast", label: "Raňajky", color: "bg-accent" },
@@ -58,13 +61,21 @@ const Feed = () => {
     
     if (!user) {
       setLoading(false);
+      setCurrentUserId(null);
       return;
     }
 
-    // Fetch public recipes with likes count
+    setCurrentUserId(user.id);
+
+    // Fetch public recipes with author information
     const { data: recipesData, error: recipesError } = await supabase
       .from("recipes")
-      .select("*")
+      .select(`
+        *,
+        profiles:user_id (
+          full_name
+        )
+      `)
       .eq("is_public", true)
       .order(sortBy === "recent" ? "created_at" : "created_at", { ascending: false });
 
@@ -90,10 +101,12 @@ const Feed = () => {
       .eq("user_id", user.id);
 
     // Calculate likes count and user's interactions
-    const recipesWithStats = recipesData?.map(recipe => {
+    const recipesWithStats = recipesData?.map((recipe: any) => {
       const recipeLikes = likesData?.filter(like => like.recipe_id === recipe.id) || [];
+      const authorName = recipe.profiles?.full_name || null;
       return {
         ...recipe,
+        author_name: authorName,
         likes_count: recipeLikes.length,
         is_liked: recipeLikes.some(like => like.user_id === user.id),
         is_saved: savedData?.some(saved => saved.recipe_id === recipe.id) || false,
@@ -332,6 +345,21 @@ const Feed = () => {
                 <CardDescription className="line-clamp-2">
                   {recipe.description}
                 </CardDescription>
+                <div className="flex flex-col gap-1 mt-2">
+                  {recipe.author_name && (
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <User className="w-3 h-3" />
+                      <span>
+                        {recipe.user_id === currentUserId ? "Ja" : recipe.author_name}
+                      </span>
+                    </div>
+                  )}
+                  {recipe.created_at && (
+                    <div className="text-xs text-muted-foreground">
+                      {format(new Date(recipe.created_at), "d.M.yyyy")}
+                    </div>
+                  )}
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="flex items-center justify-between">
@@ -360,9 +388,24 @@ const Feed = () => {
           <DialogHeader>
             <DialogTitle>{selectedRecipe?.name}</DialogTitle>
             <DialogDescription>
-              <Badge className={categories.find(c => c.value === selectedRecipe?.category)?.color}>
-                {categories.find(c => c.value === selectedRecipe?.category)?.label}
-              </Badge>
+              <div className="flex items-center gap-2 flex-wrap">
+                <Badge className={categories.find(c => c.value === selectedRecipe?.category)?.color}>
+                  {categories.find(c => c.value === selectedRecipe?.category)?.label}
+                </Badge>
+                {selectedRecipe?.author_name && (
+                  <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                    <User className="w-3 h-3" />
+                    <span>
+                      {selectedRecipe.user_id === currentUserId ? "Ja" : selectedRecipe.author_name}
+                    </span>
+                  </div>
+                )}
+                {selectedRecipe?.created_at && (
+                  <div className="text-sm text-muted-foreground">
+                    {format(new Date(selectedRecipe.created_at), "d.M.yyyy")}
+                  </div>
+                )}
+              </div>
             </DialogDescription>
           </DialogHeader>
 
@@ -417,18 +460,20 @@ const Feed = () => {
                   {selectedRecipe.is_liked ? "Odobrať lajk" : "Lajkovať"}
                   <span className="text-muted-foreground">({selectedRecipe.likes_count || 0})</span>
                 </Button>
-                <Button
-                  onClick={() => toggleSaveRecipe(selectedRecipe.id)}
-                  className="gap-2"
-                  variant={selectedRecipe.is_saved ? "destructive" : "default"}
-                >
-                  {selectedRecipe.is_saved ? (
-                    <Minus className="w-4 h-4" />
-                  ) : (
-                    <Plus className="w-4 h-4" />
-                  )}
-                  {selectedRecipe.is_saved ? "Odobrať z mojich receptov" : "Pridať do mojich receptov"}
-                </Button>
+                {selectedRecipe.user_id !== currentUserId && (
+                  <Button
+                    onClick={() => toggleSaveRecipe(selectedRecipe.id)}
+                    className="gap-2"
+                    variant={selectedRecipe.is_saved ? "destructive" : "default"}
+                  >
+                    {selectedRecipe.is_saved ? (
+                      <Minus className="w-4 h-4" />
+                    ) : (
+                      <Plus className="w-4 h-4" />
+                    )}
+                    {selectedRecipe.is_saved ? "Odobrať z mojich receptov" : "Pridať do mojich receptov"}
+                  </Button>
+                )}
               </div>
             </div>
           )}

@@ -132,7 +132,8 @@ const MealPlanDialog = ({ open, onOpenChange, plan, onSuccess }: MealPlanDialogP
       ({ error } = await supabase
         .from("meal_plans")
         .update(mealPlanData)
-        .eq("id", plan.id));
+        .eq("id", plan.id)
+        .eq("user_id", user.id));
     } else {
       ({ error } = await supabase.from("meal_plans").insert(mealPlanData));
     }
@@ -159,7 +160,22 @@ const MealPlanDialog = ({ open, onOpenChange, plan, onSuccess }: MealPlanDialogP
     if (!plan) return;
     setLoading(true);
 
-    const { error } = await supabase.from("meal_plans").delete().eq("id", plan.id);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      toast({
+        title: "Chyba",
+        description: "Musíte byť prihlásený.",
+        variant: "destructive",
+      });
+      setLoading(false);
+      return;
+    }
+
+    const { error } = await supabase
+      .from("meal_plans")
+      .delete()
+      .eq("id", plan.id)
+      .eq("user_id", user.id);
 
     if (error) {
       toast({
@@ -216,6 +232,8 @@ const MealPlanDialog = ({ open, onOpenChange, plan, onSuccess }: MealPlanDialogP
     const startDate = new Date(formData.start_date);
 
     const doc = new jsPDF();
+    const sanitizeText = (text: string) =>
+      text.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     
     // Header with green primary color
     doc.setFillColor(22, 163, 74); // green primary color
@@ -230,13 +248,13 @@ const MealPlanDialog = ({ open, onOpenChange, plan, onSuccess }: MealPlanDialogP
     // Title
     doc.setFontSize(16);
     doc.setFont("helvetica", "bold");
-    doc.text(formData.name, 105, 22, { align: "center" });
+    doc.text(sanitizeText(formData.name || "Jedalny plan"), 105, 22, { align: "center" });
     
     // Subtitle
     doc.setFontSize(11);
     doc.setFont("helvetica", "normal");
     doc.text(
-      formData.plan_type === "weekly" ? "Weekly Plan" : "Monthly Plan",
+      sanitizeText(formData.plan_type === "weekly" ? "Tyzdnovy plan" : "Mesacny plan"),
       105,
       29,
       { align: "center" }
@@ -245,7 +263,12 @@ const MealPlanDialog = ({ open, onOpenChange, plan, onSuccess }: MealPlanDialogP
     // Period
     doc.setFontSize(9);
     doc.text(
-      `Period: ${format(startDate, "dd.MM.yyyy")} - ${format(addDays(startDate, daysCount - 1), "dd.MM.yyyy")}`,
+      sanitizeText(
+        `Obdobie: ${format(startDate, "dd.MM.yyyy")} - ${format(
+          addDays(startDate, daysCount - 1),
+          "dd.MM.yyyy"
+        )}`
+      ),
       105,
       35,
       { align: "center" }
@@ -254,31 +277,31 @@ const MealPlanDialog = ({ open, onOpenChange, plan, onSuccess }: MealPlanDialogP
     // Prepare table data
     const tableData: any[] = [];
     
-    // English day names mapping
+    // Slovak day names (sanitized)
     const dayNames: Record<string, string> = {
-      "pondelok": "Monday",
-      "utorok": "Tuesday",
-      "streda": "Wednesday",
-      "štvrtok": "Thursday",
-      "piatok": "Friday",
-      "sobota": "Saturday",
-      "nedeľa": "Sunday"
+      "pondelok": "Pondelok",
+      "utorok": "Utorok",
+      "streda": "Streda",
+      "štvrtok": "Stvrtok",
+      "piatok": "Piatok",
+      "sobota": "Sobota",
+      "nedeľa": "Nedela"
     };
     
-    // English meal type names
+    // Slovak meal type names (sanitized)
     const mealTypeLabels: Record<string, string> = {
-      "ranajky": "Breakfast",
-      "desiata": "Snack",
-      "polievka": "Soup",
-      "hlavne_jedlo": "Main Course",
-      "dezert": "Dessert",
-      "vecera": "Dinner"
+      "ranajky": "Ranajky",
+      "desiata": "Desiata",
+      "polievka": "Polievka",
+      "hlavne_jedlo": "Hlavne jedlo",
+      "dezert": "Dezert",
+      "vecera": "Vecera"
     };
     
     for (let day = 1; day <= daysCount; day++) {
       const currentDate = addDays(startDate, day - 1);
       const dayNameSk = format(currentDate, "EEEE", { locale: sk }).toLowerCase();
-      const dayNameEn = dayNames[dayNameSk] || format(currentDate, "EEEE");
+      const dayName = dayNames[dayNameSk] || format(currentDate, "EEEE");
       const dateStr = format(currentDate, "dd.MM.yyyy");
       
       const meals: string[] = [];
@@ -286,22 +309,22 @@ const MealPlanDialog = ({ open, onOpenChange, plan, onSuccess }: MealPlanDialogP
         const mealLabel = mealTypeLabels[mealType] || mealType;
         const recipeId = getMealForDay(day, mealType);
         const recipe = recipes.find(r => r.id === recipeId);
-        const recipeName = recipe ? recipe.name : "Not Planned";
+        const recipeName = recipe ? recipe.name : "Neplanovane";
         
-        meals.push(`${mealLabel}: ${recipeName}`);
+        meals.push(`${sanitizeText(mealLabel)}: ${sanitizeText(recipeName)}`);
       });
       
       tableData.push([
-        dateStr,
-        dayNameEn,
-        meals.join("\n")
+        sanitizeText(dateStr),
+        sanitizeText(dayName),
+        sanitizeText(meals.join("\n"))
       ]);
     }
 
     // Add table
     autoTable(doc, {
       startY: 45,
-      head: [["Date", "Day", "Foods"]],
+      head: [[sanitizeText("Datum"), sanitizeText("Den"), sanitizeText("Jedla")]],
       body: tableData,
       theme: "grid",
       headStyles: {
@@ -332,7 +355,7 @@ const MealPlanDialog = ({ open, onOpenChange, plan, onSuccess }: MealPlanDialogP
       doc.setFontSize(8);
       doc.setTextColor(100);
       doc.text(
-        `Page ${i} of ${pageCount}`,
+        sanitizeText(`Strana ${i} z ${pageCount}`),
         105,
         doc.internal.pageSize.height - 10,
         { align: "center" }
@@ -341,12 +364,14 @@ const MealPlanDialog = ({ open, onOpenChange, plan, onSuccess }: MealPlanDialogP
 
     // Save PDF
     doc.save(
-      `mealplan-${formData.name.toLowerCase().replace(/\s+/g, "-")}-${format(new Date(), "yyyy-MM-dd")}.pdf`
+      `mealplan-${sanitizeText(formData.name || "plan")
+        .toLowerCase()
+        .replace(/\s+/g, "-")}-${format(new Date(), "yyyy-MM-dd")}.pdf`
     );
 
     toast({
-      title: "Export successful",
-      description: "Meal plan has been exported to PDF.",
+      title: "Export hotovy",
+      description: "Jedalnicky boli exportovane do PDF.",
     });
   };
 

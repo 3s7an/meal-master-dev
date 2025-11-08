@@ -16,6 +16,7 @@ const Auth = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
+  const [resendEmailSent, setResendEmailSent] = useState(false);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -84,6 +85,41 @@ const Auth = () => {
     setLoading(false);
   };
 
+  const handleResendConfirmation = async () => {
+    if (!email) {
+      toast({
+        title: "Chyba",
+        description: "Prosím zadajte email adresu.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setLoading(true);
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email: email,
+      options: {
+        emailRedirectTo: `${window.location.origin}/`,
+      },
+    });
+
+    if (error) {
+      toast({
+        title: "Chyba",
+        description: error.message,
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Email odoslaný",
+        description: "Potvrdzovací email bol odoslaný. Skontrolujte svoju schránku.",
+      });
+      setResendEmailSent(true);
+    }
+    setLoading(false);
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-primary/20 via-background to-secondary/20">
       <div className="w-full max-w-md">
@@ -132,6 +168,17 @@ const Auth = () => {
                   <Button type="submit" className="w-full" disabled={loading}>
                     {loading ? "Prihlasovanie..." : "Prihlásiť sa"}
                   </Button>
+                  <div className="text-center">
+                    <Button
+                      type="button"
+                      variant="link"
+                      onClick={handleResendConfirmation}
+                      disabled={loading || resendEmailSent}
+                      className="text-sm"
+                    >
+                      {resendEmailSent ? "Email bol odoslaný" : "Poslať potvrdzovací email znova"}
+                    </Button>
+                  </div>
                 </form>
               </CardContent>
             </Card>

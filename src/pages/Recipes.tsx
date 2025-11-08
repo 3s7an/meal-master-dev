@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Plus, Search, Clock, Users, BookmarkMinus } from "lucide-react";
+import { Plus, Search, Clock, Users, BookmarkMinus, User } from "lucide-react";
+import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import RecipeDialog from "@/components/RecipeDialog";
 
@@ -29,6 +30,7 @@ type RecipeSource = "own" | "saved";
 type UserRecipe = Recipe & {
   source: RecipeSource;
   saved_at?: string;
+  author_name?: string | null;
 };
 
 const Recipes = () => {
@@ -42,6 +44,7 @@ const Recipes = () => {
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
   const [isSavedDialogOpen, setIsSavedDialogOpen] = useState(false);
   const [selectedSavedRecipe, setSelectedSavedRecipe] = useState<UserRecipe | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   const categories = [
     { value: "breakfast", label: "Raňajky", color: "bg-accent" },
@@ -64,8 +67,11 @@ const Recipes = () => {
     
     if (!user) {
       setLoading(false);
+      setCurrentUserId(null);
       return;
     }
+
+    setCurrentUserId(user.id);
 
     const [
       { data: ownData, error: ownError },
@@ -78,7 +84,16 @@ const Recipes = () => {
         .order("created_at", { ascending: false }),
       supabase
         .from("saved_recipes")
-        .select("id, created_at, recipes(*)")
+        .select(`
+          id, 
+          created_at, 
+          recipes(
+            *,
+            profiles:user_id (
+              full_name
+            )
+          )
+        `)
         .eq("user_id", user.id)
         .order("created_at", { ascending: false }),
     ]);
@@ -94,16 +109,20 @@ const Recipes = () => {
         (ownData || []).map((recipe) => ({
           ...recipe,
           source: "own" as const,
+          author_name: null, // Vlastné recepty - zobrazíme "Ja"
         })) ?? [];
 
       const savedRecipes: UserRecipe[] =
         (savedData || [])
           .map((entry: any) => {
             if (!entry.recipes) return null;
+            const recipe = entry.recipes;
+            const authorName = recipe.profiles?.full_name || null;
             return {
-              ...entry.recipes,
+              ...recipe,
               source: "saved" as RecipeSource,
               saved_at: entry.created_at as string | undefined,
+              author_name: authorName,
             } as UserRecipe;
           })
           .filter(Boolean) as UserRecipe[];
@@ -342,6 +361,21 @@ const Recipes = () => {
                 <CardDescription className="line-clamp-2">
                   {recipe.description}
                 </CardDescription>
+                <div className="flex flex-col gap-1 mt-2">
+                  {recipe.user_id && (
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <User className="w-3 h-3" />
+                      <span>
+                        {recipe.user_id === currentUserId ? "Ja" : (recipe.author_name || "Neznámy autor")}
+                      </span>
+                    </div>
+                  )}
+                  {recipe.created_at && (
+                    <div className="text-xs text-muted-foreground">
+                      {format(new Date(recipe.created_at), "d.M.yyyy")}
+                    </div>
+                  )}
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="flex items-center justify-between">
@@ -391,7 +425,7 @@ const Recipes = () => {
             <DialogTitle>{selectedSavedRecipe?.name}</DialogTitle>
             {selectedSavedRecipe && (
               <DialogDescription>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <Badge
                     className={
                       categories.find((c) => c.value === selectedSavedRecipe.category)?.color
@@ -400,6 +434,21 @@ const Recipes = () => {
                     {categories.find((c) => c.value === selectedSavedRecipe.category)?.label}
                   </Badge>
                   <Badge variant="secondary">Uložené</Badge>
+                  {selectedSavedRecipe.user_id && (
+                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                      <User className="w-3 h-3" />
+                      <span>
+                        {selectedSavedRecipe.user_id === currentUserId 
+                          ? "Ja" 
+                          : (selectedSavedRecipe.author_name || "Neznámy autor")}
+                      </span>
+                    </div>
+                  )}
+                  {selectedSavedRecipe.created_at && (
+                    <div className="text-sm text-muted-foreground">
+                      {format(new Date(selectedSavedRecipe.created_at), "d.M.yyyy")}
+                    </div>
+                  )}
                 </div>
               </DialogDescription>
             )}
