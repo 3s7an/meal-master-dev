@@ -6,8 +6,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, ShoppingCart } from "lucide-react";
+import { Plus, Trash2, ShoppingCart, Globe, Lock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { Switch } from "@/components/ui/switch";
 
 interface Ingredient {
   name: string;
@@ -44,6 +45,7 @@ const RecipeDialog = ({ open, onOpenChange, recipe, onSuccess }: RecipeDialogPro
     instructions: "",
     calories: "",
     notes: "",
+    is_public: false,
   });
   const [ingredients, setIngredients] = useState<Ingredient[]>([
     { name: "", quantity: 0, unit: "" },
@@ -58,6 +60,7 @@ const RecipeDialog = ({ open, onOpenChange, recipe, onSuccess }: RecipeDialogPro
         instructions: recipe.instructions,
         calories: recipe.calories?.toString() || "",
         notes: recipe.notes || "",
+        is_public: (recipe as any).is_public || false,
       });
       setIngredients(recipe.ingredients.length > 0 ? recipe.ingredients : [{ name: "", quantity: 0, unit: "" }]);
     } else {
@@ -73,6 +76,7 @@ const RecipeDialog = ({ open, onOpenChange, recipe, onSuccess }: RecipeDialogPro
       instructions: "",
       calories: "",
       notes: "",
+      is_public: false,
     });
     setIngredients([{ name: "", quantity: 0, unit: "" }]);
   };
@@ -115,6 +119,7 @@ const RecipeDialog = ({ open, onOpenChange, recipe, onSuccess }: RecipeDialogPro
       instructions: formData.instructions,
       calories: formData.calories ? parseInt(formData.calories) : null,
       notes: formData.notes,
+      is_public: formData.is_public,
     };
 
     let error;
@@ -328,6 +333,31 @@ const RecipeDialog = ({ open, onOpenChange, recipe, onSuccess }: RecipeDialogPro
               value={formData.notes}
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
               rows={2}
+            />
+          </div>
+
+          <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/50">
+            <div className="flex items-center gap-3">
+              {formData.is_public ? (
+                <Globe className="w-5 h-5 text-primary" />
+              ) : (
+                <Lock className="w-5 h-5 text-muted-foreground" />
+              )}
+              <div>
+                <Label htmlFor="is_public" className="cursor-pointer">
+                  {formData.is_public ? "Verejný recept" : "Súkromný recept"}
+                </Label>
+                <p className="text-sm text-muted-foreground">
+                  {formData.is_public 
+                    ? "Recept uvidia všetci používatelia" 
+                    : "Recept uvidíte len vy"}
+                </p>
+              </div>
+            </div>
+            <Switch
+              id="is_public"
+              checked={formData.is_public}
+              onCheckedChange={(checked) => setFormData({ ...formData, is_public: checked })}
             />
           </div>
 

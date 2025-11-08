@@ -2,7 +2,7 @@ import { ReactNode, useEffect, useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { ChefHat, UtensilsCrossed, ShoppingCart, Calendar, LogOut, User } from "lucide-react";
+import { ChefHat, UtensilsCrossed, ShoppingCart, Calendar, LogOut, User, Rss } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Session } from "@supabase/supabase-js";
 
@@ -49,6 +49,7 @@ const Layout = ({ children }: LayoutProps) => {
 
   const navItems = [
     { to: "/", icon: UtensilsCrossed, label: "Recepty" },
+    { to: "/feed", icon: Rss, label: "Feed" },
     { to: "/shopping-list", icon: ShoppingCart, label: "Nákupný zoznam" },
     { to: "/meal-plans", icon: Calendar, label: "Jedálničky" },
   ];
