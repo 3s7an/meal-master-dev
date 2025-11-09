@@ -236,11 +236,11 @@ const ShoppingList = () => {
 
       const addFooter = (targetPage: any, index: number, total: number) => {
         const { width } = targetPage.getSize();
-        const instructionText = "Tip: Odsktnite polozky kliknutim na checkboxy";
+        const instructionText = "Tip: Odsktnite polozky kliknutim na checkboxy. Na mobile pouzite Adobe Acrobat Reader pre plnu funkcnost.";
         targetPage.drawText(sanitizeText(instructionText), {
-          x: centerText(targetPage, instructionText, helveticaFont, 8),
+          x: centerText(targetPage, instructionText, helveticaFont, 7),
           y: 30,
-          size: 8,
+          size: 7,
           font: helveticaFont,
           color: rgb(0.4, 0.4, 0.4),
         });
@@ -260,29 +260,73 @@ const ShoppingList = () => {
       let currentY = drawHeader(currentPage);
       let currentPageIndex = 0;
 
-      // Layout settings
-      const lineHeight = 24;
-      const bottomMargin = 80;
-      const checkboxSize = 14;
-      const checkboxX = 40;
+      // Layout settings - optimized for mobile with much larger checkboxes
+      const bottomMargin = 100;
+      const checkboxSize = 35; // Much larger checkbox for mobile (35px for easy touch interaction)
+      const textSpacing = 25; // Increased spacing between checkbox and text
+      const itemFontSize = 18; // Larger font for readability
+      const textLineHeight = itemFontSize + 10; // Line height for wrapped text
+      const rowSpacing = 30; // Spacing between items
+      const horizontalMargin = 60; // Horizontal margin for centered layout
+
+      // Helper to wrap text within available width
+      const wrapText = (text: string, maxWidth: number, fontRef: any, fontSize: number) => {
+        const words = text.split(" ");
+        const lines: string[] = [];
+        let currentLine = "";
+
+        const pushCurrentLine = () => {
+          if (currentLine.trim().length > 0) {
+            lines.push(currentLine.trim());
+            currentLine = "";
+          }
+        };
+
+        words.forEach((word) => {
+          const testLine = currentLine ? `${currentLine} ${word}` : word;
+          const testWidth = fontRef.widthOfTextAtSize(testLine, fontSize);
+
+          if (testWidth <= maxWidth) {
+            currentLine = testLine;
+          } else {
+            pushCurrentLine();
+            // Handle words longer than max width by splitting characters
+            let partial = "";
+            for (const char of word) {
+              const testPartial = partial + char;
+              if (fontRef.widthOfTextAtSize(testPartial, fontSize) <= maxWidth) {
+                partial = testPartial;
+              } else {
+                if (partial.length > 0) {
+                  lines.push(partial);
+                }
+                partial = char;
+              }
+            }
+            currentLine = partial;
+          }
+        });
+
+        pushCurrentLine();
+        return lines.length > 0 ? lines : [text];
+      };
+
+      let { width: pageWidth } = currentPage.getSize();
 
       // Draw items with checkboxes
       uncheckedItems.forEach((item, index) => {
         if (currentY < bottomMargin) {
           currentPage = pdfDoc.addPage([595, 842]);
           currentY = drawHeader(currentPage);
+          ({ width: pageWidth } = currentPage.getSize());
           currentPageIndex++;
         }
 
-        const checkbox = form.createCheckBox(`checkbox_${index}`);
-        const checkboxY = currentY - checkboxSize;
-
-        checkbox.addToPage(currentPage, {
-          x: checkboxX,
-          y: checkboxY,
-          width: checkboxSize,
-          height: checkboxSize,
-        });
+        // Calculate available width for text
+        let maxTextWidth = pageWidth - 2 * horizontalMargin - checkboxSize - textSpacing;
+        if (maxTextWidth < 120) {
+          maxTextWidth = pageWidth - checkboxSize - textSpacing - 40;
+        }
 
         const quantityText = item.quantity && item.unit
           ? `${item.quantity} ${item.unit}`.trim()
@@ -293,15 +337,63 @@ const ShoppingList = () => {
           : item.item_name;
         const itemText = sanitizeText(itemTextRaw);
 
-        currentPage.drawText(itemText, {
-          x: checkboxX + checkboxSize + 12,
-          y: checkboxY + 4,
-          size: 11,
-          font: helveticaFont,
-          color: rgb(0, 0, 0),
+        const wrappedLines = wrapText(itemText, maxTextWidth, helveticaFont, itemFontSize);
+        const textBlockHeight = wrappedLines.length * textLineHeight;
+
+        const contentHeight = Math.max(checkboxSize, textBlockHeight);
+        const requiredHeight = contentHeight + rowSpacing;
+
+        if (currentY - requiredHeight < bottomMargin) {
+          currentPage = pdfDoc.addPage([595, 842]);
+          currentY = drawHeader(currentPage);
+          ({ width: pageWidth } = currentPage.getSize());
+
+          maxTextWidth = pageWidth - 2 * horizontalMargin - checkboxSize - textSpacing;
+          if (maxTextWidth < 120) {
+            maxTextWidth = pageWidth - checkboxSize - textSpacing - 40;
+          }
+        }
+
+        const checkboxXPos = horizontalMargin;
+        const textXPos = checkboxXPos + checkboxSize + textSpacing;
+
+        const checkboxOffsetY = contentHeight > checkboxSize ? (contentHeight - checkboxSize) / 2 : 0;
+        const textOffsetY = contentHeight > textBlockHeight ? (contentHeight - textBlockHeight) / 2 : 0;
+
+        const topY = currentY;
+        const checkboxY = topY - checkboxOffsetY - checkboxSize;
+
+        // Create checkbox with unique name for each page
+        const checkboxName = `item_${currentPageIndex}_${index}`;
+        const checkbox = form.createCheckBox(checkboxName);
+
+        // Add checkbox with larger size for mobile (35px for easy touch interaction)
+        checkbox.addToPage(currentPage, {
+          x: checkboxXPos,
+          y: checkboxY,
+          width: checkboxSize,
+          height: checkboxSize,
         });
 
-        currentY -= lineHeight;
+        // Set checkbox as unchecked by default
+        checkbox.uncheck();
+
+        // Note: Chrome-native on mobile has very limited support for interactive PDF forms
+        // For best results, users should use Adobe Acrobat Reader alebo podobné PDF aplikácie
+
+        // Draw text with better spacing and alignment for mobile
+        let textBaseline = topY - textOffsetY - itemFontSize;
+        wrappedLines.forEach((line, lineIndex) => {
+          currentPage.drawText(line, {
+            x: textXPos,
+            y: textBaseline - textLineHeight * lineIndex,
+            size: itemFontSize,
+            font: helveticaFont,
+            color: rgb(0, 0, 0),
+          });
+        });
+
+        currentY = topY - contentHeight - rowSpacing;
       });
 
       // Add footer to all pages
@@ -311,9 +403,13 @@ const ShoppingList = () => {
         addFooter(page, i, totalPages);
       }
 
+      // Ensure form is properly configured for mobile
+      // Note: Some mobile PDF viewers (especially Chrome-native) have limited support
+      // for interactive forms. Users may need to use Adobe Acrobat Reader or similar apps
+      
       // Save PDF
       const pdfBytes = await pdfDoc.save();
-      const blob = new Blob([pdfBytes], { type: "application/pdf" });
+      const blob = new Blob([pdfBytes.buffer as ArrayBuffer], { type: "application/pdf" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;

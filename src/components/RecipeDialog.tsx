@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, Trash2, ShoppingCart, Globe, Lock, X, Image as ImageIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
+import { CATEGORY_OPTIONS, DEFAULT_CATEGORY, normalizeCategory } from "@/constants/categories";
 
 interface Ingredient {
   name: string;
@@ -41,7 +42,7 @@ const RecipeDialog = ({ open, onOpenChange, recipe, onSuccess }: RecipeDialogPro
   const [formData, setFormData] = useState({
     name: "",
     description: "",
-    category: "lunch",
+    category: DEFAULT_CATEGORY,
     instructions: "",
     calories: "",
     notes: "",
@@ -59,7 +60,7 @@ const RecipeDialog = ({ open, onOpenChange, recipe, onSuccess }: RecipeDialogPro
       setFormData({
         name: recipe.name,
         description: recipe.description,
-        category: recipe.category,
+        category: normalizeCategory(recipe.category),
         instructions: recipe.instructions,
         calories: recipe.calories?.toString() || "",
         notes: recipe.notes || "",
@@ -77,7 +78,7 @@ const RecipeDialog = ({ open, onOpenChange, recipe, onSuccess }: RecipeDialogPro
     setFormData({
       name: "",
       description: "",
-      category: "lunch",
+      category: DEFAULT_CATEGORY,
       instructions: "",
       calories: "",
       notes: "",
@@ -472,10 +473,11 @@ const RecipeDialog = ({ open, onOpenChange, recipe, onSuccess }: RecipeDialogPro
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="breakfast">Raňajky</SelectItem>
-                  <SelectItem value="lunch">Obed</SelectItem>
-                  <SelectItem value="dinner">Večera</SelectItem>
-                  <SelectItem value="snack">Snack</SelectItem>
+                    {CATEGORY_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>

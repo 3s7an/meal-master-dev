@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { CATEGORY_OPTIONS, getCategoryOption, normalizeCategory } from "@/constants/categories";
 
 interface Recipe {
   id: string;
@@ -40,12 +41,7 @@ const Feed = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
-  const categories = [
-    { value: "breakfast", label: "Raňajky", color: "bg-accent" },
-    { value: "lunch", label: "Obed", color: "bg-primary" },
-    { value: "dinner", label: "Večera", color: "bg-secondary" },
-    { value: "snack", label: "Snack", color: "bg-muted" },
-  ];
+  const categories = CATEGORY_OPTIONS;
 
   useEffect(() => {
     fetchRecipes();
@@ -104,8 +100,10 @@ const Feed = () => {
     const recipesWithStats = recipesData?.map((recipe: any) => {
       const recipeLikes = likesData?.filter(like => like.recipe_id === recipe.id) || [];
       const authorName = recipe.profiles?.full_name || null;
+      const normalizedCategory = normalizeCategory(recipe.category);
       return {
         ...recipe,
+        category: normalizedCategory,
         author_name: authorName,
         likes_count: recipeLikes.length,
         is_liked: recipeLikes.some(like => like.user_id === user.id),
@@ -334,13 +332,14 @@ const Feed = () => {
               <CardHeader>
                 <div className="flex items-start justify-between gap-2">
                   <CardTitle className="line-clamp-1">{recipe.name}</CardTitle>
-                  <Badge
-                    className={
-                      categories.find((c) => c.value === recipe.category)?.color
-                    }
-                  >
-                    {categories.find((c) => c.value === recipe.category)?.label}
-                  </Badge>
+                  {(() => {
+                    const option = getCategoryOption(recipe.category);
+                    return (
+                      <Badge className={option.badgeClass}>
+                        {option.label}
+                      </Badge>
+                    );
+                  })()}
                 </div>
                 <CardDescription className="line-clamp-2">
                   {recipe.description}
@@ -389,9 +388,11 @@ const Feed = () => {
             <DialogTitle>{selectedRecipe?.name}</DialogTitle>
             <DialogDescription>
               <div className="flex items-center gap-2 flex-wrap">
-                <Badge className={categories.find(c => c.value === selectedRecipe?.category)?.color}>
-                  {categories.find(c => c.value === selectedRecipe?.category)?.label}
-                </Badge>
+                {selectedRecipe && (
+                  <Badge className={getCategoryOption(selectedRecipe.category).badgeClass}>
+                    {getCategoryOption(selectedRecipe.category).label}
+                  </Badge>
+                )}
                 {selectedRecipe?.author_name && (
                   <div className="flex items-center gap-1 text-sm text-muted-foreground">
                     <User className="w-3 h-3" />

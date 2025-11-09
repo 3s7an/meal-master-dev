@@ -5,8 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Plus, Calendar as CalendarIcon, Trash2, Edit, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import MealPlanDialog from "@/components/MealPlanDialog";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import { addDays, format } from "date-fns";
 import { sk } from "date-fns/locale";
 
@@ -23,6 +22,40 @@ interface Recipe {
   id: string;
   name: string;
 }
+
+const FALLBACK_MEAL_TYPES = ["ranajky", "snack", "polievka", "hlavne_jedlo", "vecera"];
+
+const normalizeMealType = (id: string) => {
+  if (id === "desiata" || id === "dezert") {
+    return "snack";
+  }
+  return id;
+};
+
+const normalizeMealTypes = (types: string[] = []) => {
+  const normalized = types.map(normalizeMealType);
+  return Array.from(new Set(normalized));
+};
+
+const capitalize = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
+
+const migratePlanDataKeys = (data: any = {}) => {
+  const result: Record<string, any> = {};
+  Object.entries(data).forEach(([key, value]) => {
+    if (key === "meal_types") {
+      return;
+    }
+    let newKey = key;
+    if (key.includes("_desiata")) {
+      newKey = key.replace("_desiata", "_snack");
+    }
+    if (key.includes("_dezert")) {
+      newKey = key.replace("_dezert", "_snack");
+    }
+    result[newKey] = value;
+  });
+  return result;
+};
 
 const MealPlans = () => {
   const { toast } = useToast();
@@ -114,162 +147,288 @@ const MealPlans = () => {
   };
 
   const exportMealPlan = async (plan: MealPlan) => {
-    // Fetch recipes
-    const { data: recipesData } = await supabase
-      .from("recipes")
-      .select("id, name")
-      .order("name");
+    try {
+      // Fetch recipes
+      const { data: recipesData } = await supabase
+        .from("recipes")
+        .select("id, name")
+        .order("name");
 
-    const recipes: Recipe[] = recipesData || [];
+      const recipes: Recipe[] = recipesData || [];
 
-    const daysCount = plan.plan_type === "weekly" ? 7 : 30;
-    const activeMealTypes = plan.plan_data?.meal_types || ["ranajky", "hlavne_jedlo", "vecera"];
-    const startDate = new Date(plan.start_date);
-    const planData = plan.plan_data || {};
+      const daysCount = plan.plan_type === "weekly" ? 7 : 30;
+      const normalizedMealTypes = normalizeMealTypes(plan.plan_data?.meal_types || FALLBACK_MEAL_TYPES);
+      const activeMealTypes = FALLBACK_MEAL_TYPES.filter((type) => normalizedMealTypes.includes(type));
+      const startDate = new Date(plan.start_date);
+      const planData = migratePlanDataKeys(plan.plan_data || {});
 
-    const doc = new jsPDF();
-    const sanitizeText = (text: string) =>
-      text.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    
-    // Header with green primary color
-    doc.setFillColor(22, 163, 74); // green primary color
-    doc.rect(0, 0, 210, 40, "F");
-    
-    // MealMaster Logo/Brand
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(24);
-    doc.setFont("helvetica", "bold");
-    doc.text("MealMaster", 105, 13, { align: "center" });
-    
-    // Title
-    doc.setFontSize(16);
-    doc.setFont("helvetica", "bold");
-    doc.text(sanitizeText(plan.name || "Jedalny plan"), 105, 22, { align: "center" });
-    
-    // Subtitle
-    doc.setFontSize(11);
-    doc.setFont("helvetica", "normal");
-    doc.text(
-      sanitizeText(plan.plan_type === "weekly" ? "Tyzdnovy plan" : "Mesacny plan"),
-      105,
-      29,
-      { align: "center" }
-    );
-    
-    // Period
-    doc.setFontSize(9);
-    doc.text(
-      sanitizeText(
-        `Obdobie: ${format(startDate, "dd.MM.yyyy")} - ${format(
-          addDays(startDate, daysCount - 1),
-          "dd.MM.yyyy"
-        )}`
-      ),
-      105,
-      35,
-      { align: "center" }
-    );
-
-    // Prepare table data
-    const tableData: any[] = [];
-    
-    // Slovak day names
-    const dayNames: Record<string, string> = {
-      "pondelok": "Pondelok",
-      "utorok": "Utorok",
-      "streda": "Streda",
-      "štvrtok": "Stvrtok",
-      "piatok": "Piatok",
-      "sobota": "Sobota",
-      "nedeľa": "Nedela"
-    };
-    
-    // Slovak meal type names
-    const mealTypeLabels: Record<string, string> = {
-      "ranajky": "Ranajky",
-      "desiata": "Desiata",
-      "polievka": "Polievka",
-      "hlavne_jedlo": "Hlavne jedlo",
-      "dezert": "Dezert",
-      "vecera": "Vecera"
-    };
-    
-    for (let day = 1; day <= daysCount; day++) {
-      const currentDate = addDays(startDate, day - 1);
-      const dayNameSk = format(currentDate, "EEEE", { locale: sk }).toLowerCase();
-      const dayName = dayNames[dayNameSk] || format(currentDate, "EEEE");
-      const dateStr = format(currentDate, "dd.MM.yyyy");
+      // Create PDF document
+      const pdfDoc = await PDFDocument.create();
       
-      const meals: string[] = [];
-      activeMealTypes.forEach((mealType: string) => {
-        const mealLabel = mealTypeLabels[mealType] || mealType;
-        const key = `day_${day}_${mealType}`;
-        const recipeId = planData[key];
-        const recipe = recipes.find(r => r.id === recipeId);
-        const recipeName = recipe ? recipe.name : "Neplanovane";
+      // A4 page dimensions (595 x 842 points)
+      const width = 595;
+      const height = 842;
+
+      // Load fonts
+      const helveticaFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
+      const helveticaBoldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+
+      const sanitizeText = (text: string) =>
+        text.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+      const centerText = (text: string, font: any, fontSize: number) => {
+        const textWidth = font.widthOfTextAtSize(sanitizeText(text), fontSize);
+        return (width - textWidth) / 2;
+      };
+
+      // Helper function to draw header
+      const drawHeader = async (page: any) => {
+        // Header background - WHITE background
+        page.drawRectangle({
+          x: 0,
+          y: height - 50,
+          width,
+          height: 50,
+          color: rgb(1, 1, 1), // White background
+        });
+
+        // Plan type - centered, black color, same font as period
+        const planTypeText = sanitizeText(plan.plan_type === "weekly" ? "Tyzdnovy plan" : "Mesacny plan");
+        page.drawText(planTypeText, {
+          x: centerText(planTypeText, helveticaFont, 11),
+          y: height - 25,
+          size: 11,
+          font: helveticaFont,
+          color: rgb(0, 0, 0), // Black text
+        });
+
+        // Period - centered, black color, below plan type with larger spacing
+        const periodText = sanitizeText(
+          `Obdobie: ${format(startDate, "dd.MM.yyyy")} - ${format(
+            addDays(startDate, daysCount - 1),
+            "dd.MM.yyyy"
+          )}`
+        );
+        page.drawText(periodText, {
+          x: centerText(periodText, helveticaFont, 11),
+          y: height - 40,
+          size: 11,
+          font: helveticaFont,
+          color: rgb(0, 0, 0), // Black text
+        });
+      };
+
+
+      // Prepare table data
+      const tableData: string[][] = [];
+      
+      // Slovak day names
+      const dayNames: Record<string, string> = {
+        "pondelok": "Pondelok",
+        "utorok": "Utorok",
+        "streda": "Streda",
+        "štvrtok": "Stvrtok",
+        "piatok": "Piatok",
+        "sobota": "Sobota",
+        "nedeľa": "Nedela"
+      };
+      
+      // Slovak meal type names
+      const mealTypeLabels: Record<string, string> = {
+        "ranajky": "Raňajky",
+        "snack": "Snack",
+        "polievka": "Polievka",
+        "hlavne_jedlo": "Hlavne jedlo",
+        "vecera": "Večera",
+        // Legacy labels
+        "desiata": "Snack",
+        "dezert": "Snack",
+      };
+      
+      for (let day = 1; day <= daysCount; day++) {
+        const currentDate = addDays(startDate, day - 1);
+        const dayNameSk = format(currentDate, "EEEE", { locale: sk }).toLowerCase();
+        const fallbackDayName = format(currentDate, "EEEE", { locale: sk });
+        const dayName = dayNames[dayNameSk] || capitalize(fallbackDayName);
+        const dateStr = format(currentDate, "dd.MM.yyyy");
         
-        meals.push(`${sanitizeText(mealLabel)}: ${sanitizeText(recipeName)}`);
-      });
-      
-      tableData.push([
-        sanitizeText(dateStr),
-        sanitizeText(dayName),
-        sanitizeText(meals.join("\n"))
-      ]);
-    }
-
-    // Add table
-    autoTable(doc, {
-      startY: 45,
-      head: [[sanitizeText("Datum"), sanitizeText("Den"), sanitizeText("Jedla")]],
-      body: tableData,
-      theme: "grid",
-      headStyles: {
-        fillColor: [22, 163, 74], // green primary color
-        textColor: [255, 255, 255],
-        fontSize: 11,
-        fontStyle: "bold",
-        halign: "center"
-      },
-      bodyStyles: {
-        fontSize: 9,
-        cellPadding: 5
-      },
-      columnStyles: {
-        0: { cellWidth: 30, halign: "center" },
-        1: { cellWidth: 35, halign: "center" },
-        2: { cellWidth: 125, halign: "left" }
-      },
-      alternateRowStyles: {
-        fillColor: [245, 245, 250]
+        const meals: string[] = [];
+        activeMealTypes.forEach((mealType: string) => {
+          const normalizedMealType = normalizeMealType(mealType);
+          const mealLabel = mealTypeLabels[normalizedMealType] || normalizedMealType;
+          const key = `day_${day}_${normalizedMealType}`;
+          const recipeId = planData[key];
+          const recipe = recipes.find(r => r.id === recipeId);
+          const recipeName = recipe ? recipe.name : "Neplanovane";
+          
+          meals.push(`${sanitizeText(mealLabel)}: ${sanitizeText(recipeName)}`);
+        });
+        
+        tableData.push([
+          sanitizeText(dateStr),
+          sanitizeText(dayName),
+          sanitizeText(meals.join("\n"))
+        ]);
       }
-    });
 
-    // Footer
-    const pageCount = (doc as any).internal.getNumberOfPages();
-    for (let i = 1; i <= pageCount; i++) {
-      doc.setPage(i);
-      doc.setFontSize(8);
-      doc.setTextColor(100);
-      doc.text(
-        sanitizeText(`Strana ${i} z ${pageCount}`),
-        105,
-        doc.internal.pageSize.height - 10,
-        { align: "center" }
-      );
-    }
+      // Create first page
+      let currentPage = pdfDoc.addPage([595, 842]);
+      await drawHeader(currentPage);
+      
+      // Draw table (split across pages if needed)
+      const rowHeight = 35; // Increased row height for better spacing
+      const headerHeight = 20;
+      const startY = height - 55; // Reduced spacing from period to table
+      let currentY = startY;
+      const bottomMargin = 50;
 
-    // Save PDF
-    doc.save(
-      `mealplan-${sanitizeText(plan.name || "plan")
+      // Draw header row first
+      currentPage.drawRectangle({
+        x: 0,
+        y: currentY - headerHeight,
+        width,
+        height: headerHeight,
+        color: rgb(0.086, 0.639, 0.290),
+      });
+
+      const headers = ["Datum", "Den", "Jedla"];
+      const colWidths = [90, 70, 435]; // Increased date column width from 60 to 90
+      let xPos = 0;
+      headers.forEach((header, idx) => {
+        currentPage.drawText(sanitizeText(header), {
+          x: xPos + (idx === 2 ? 5 : colWidths[idx] / 2 - 10),
+          y: currentY - 13,
+          size: 11,
+          font: helveticaBoldFont,
+          color: rgb(1, 1, 1),
+        });
+        xPos += colWidths[idx];
+      });
+
+      currentY -= headerHeight;
+
+      // Draw rows
+      for (let rowIdx = 0; rowIdx < tableData.length; rowIdx++) {
+        const row = tableData[rowIdx];
+        // Check if we need a new page
+        if (currentY < bottomMargin + rowHeight) {
+          currentPage = pdfDoc.addPage([595, 842]);
+          await drawHeader(currentPage);
+          currentY = startY - headerHeight;
+          
+          // Redraw header row on new page
+          currentPage.drawRectangle({
+            x: 0,
+            y: currentY,
+            width,
+            height: headerHeight,
+            color: rgb(0.086, 0.639, 0.290),
+          });
+          xPos = 0;
+          headers.forEach((header, idx) => {
+            currentPage.drawText(sanitizeText(header), {
+              x: xPos + (idx === 2 ? 5 : colWidths[idx] / 2 - 10),
+              y: currentY + 7,
+              size: 11,
+              font: helveticaBoldFont,
+              color: rgb(1, 1, 1),
+            });
+            xPos += colWidths[idx];
+          });
+          currentY -= headerHeight;
+        }
+
+        // Alternate row color
+        if (rowIdx % 2 === 0) {
+          currentPage.drawRectangle({
+            x: 0,
+            y: currentY - rowHeight,
+            width,
+            height: rowHeight,
+            color: rgb(0.96, 0.96, 0.98),
+          });
+        }
+
+        // Draw cell borders
+        xPos = 0;
+        colWidths.forEach((colWidth) => {
+          currentPage.drawLine({
+            start: { x: xPos, y: currentY },
+            end: { x: xPos, y: currentY - rowHeight },
+            thickness: 0.5,
+            color: rgb(0.8, 0.8, 0.8),
+          });
+          xPos += colWidth;
+        });
+
+        // Draw cell content
+        xPos = 0;
+        row.forEach((cell, cellIdx) => {
+          const lines = cell.split("\n");
+          const lineSpacing = 12;
+          const startYOffset = rowHeight / 2 - (lines.length - 1) * lineSpacing / 2;
+          lines.forEach((line, lineIdx) => {
+            currentPage.drawText(sanitizeText(line), {
+              x: xPos + (cellIdx === 2 ? 5 : colWidths[cellIdx] / 2 - 10),
+              y: currentY - startYOffset - (lineIdx * lineSpacing),
+              size: 9,
+              font: helveticaFont,
+              color: rgb(0, 0, 0),
+            });
+          });
+          xPos += colWidths[cellIdx];
+        });
+
+        currentY -= rowHeight;
+      }
+
+      // Draw final bottom border
+      const lastPage = pdfDoc.getPage(pdfDoc.getPageCount() - 1);
+      lastPage.drawLine({
+        start: { x: 0, y: currentY },
+        end: { x: width, y: currentY },
+        thickness: 0.5,
+        color: rgb(0.8, 0.8, 0.8),
+      });
+
+      // Add footer to all pages
+      const totalPages = pdfDoc.getPageCount();
+      for (let i = 0; i < totalPages; i++) {
+        const page = pdfDoc.getPage(i);
+        const pageText = sanitizeText(`Strana ${i + 1} z ${totalPages}`);
+        page.drawText(pageText, {
+          x: centerText(pageText, helveticaFont, 8),
+          y: 15,
+          size: 8,
+          font: helveticaFont,
+          color: rgb(0.4, 0.4, 0.4),
+        });
+      }
+
+      // Save PDF
+      const pdfBytes = await pdfDoc.save();
+      const blob = new Blob([pdfBytes], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `mealplan-${sanitizeText(plan.name || "plan")
         .toLowerCase()
-        .replace(/\s+/g, "-")}-${format(new Date(), "yyyy-MM-dd")}.pdf`
-    );
+        .replace(/\s+/g, "-")}-${format(new Date(), "yyyy-MM-dd")}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
 
-    toast({
-      title: "Export hotovy",
-      description: "Jedalnicek bol exportovany do PDF.",
-    });
+      toast({
+        title: "Export hotovy",
+        description: "Jedalnicek bol exportovany do PDF.",
+      });
+    } catch (error) {
+      console.error("Error creating PDF:", error);
+      toast({
+        title: "Chyba",
+        description: "Nepodarilo sa vytvoriť PDF súbor.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (

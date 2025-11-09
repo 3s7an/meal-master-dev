@@ -5,12 +5,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Card, CardContent } from "@/components/ui/card";
-import { Trash2, Plus, Download } from "lucide-react";
+import { Trash2, Plus, Download, Check, ChevronsUpDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { addDays, format } from "date-fns";
 import { sk } from "date-fns/locale";
 import { Checkbox } from "@/components/ui/checkbox";
+import { cn } from "@/lib/utils";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -26,12 +29,61 @@ interface MealPlan {
 
 const MEAL_TYPE_OPTIONS = [
   { id: "ranajky", label: "Raňajky" },
-  { id: "desiata", label: "Desiata" },
+  { id: "snack", label: "Snack" },
   { id: "polievka", label: "Polievka" },
   { id: "hlavne_jedlo", label: "Hlavné jedlo" },
-  { id: "dezert", label: "Dezert" },
   { id: "vecera", label: "Večera" },
 ];
+
+const DEFAULT_MEAL_TYPES = ["ranajky", "snack", "polievka", "hlavne_jedlo", "vecera"];
+
+const normalizeMealType = (id: string) => {
+  if (id === "desiata" || id === "dezert") {
+    return "snack";
+  }
+  return id;
+};
+
+const normalizeMealTypes = (types: string[] = []) => {
+  const normalized = types.map(normalizeMealType);
+  return Array.from(new Set(normalized)).filter((type) =>
+    MEAL_TYPE_OPTIONS.some((option) => option.id === type)
+  );
+};
+
+const migratePlanDataKeys = (data: any = {}) => {
+  const result: Record<string, any> = {};
+  Object.entries(data).forEach(([key, value]) => {
+    // Skip meal_types, it will be handled separately
+    if (key === "meal_types") {
+      return;
+    }
+    
+    let newKey = key;
+    
+    // Migrate old meal type keys to new format
+    if (key.includes("_desiata")) {
+      newKey = key.replace("_desiata", "_snack");
+    } else if (key.includes("_dezert")) {
+      newKey = key.replace("_dezert", "_snack");
+    } else if (key.includes("_breakfast")) {
+      newKey = key.replace("_breakfast", "_ranajky");
+    } else if (key.includes("_lunch")) {
+      newKey = key.replace("_lunch", "_hlavne_jedlo");
+    } else if (key.includes("_dinner")) {
+      newKey = key.replace("_dinner", "_vecera");
+    }
+    
+    // Only keep the new key if it doesn't already exist
+    // This prevents overwriting newer data with older migrated data
+    if (!result[newKey] || newKey === key) {
+      result[newKey] = value;
+    }
+  });
+  return result;
+};
+
+const capitalize = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
 
 interface Recipe {
   id: string;
@@ -50,28 +102,47 @@ const MealPlanDialog = ({ open, onOpenChange, plan, onSuccess }: MealPlanDialogP
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const [recipesLoaded, setRecipesLoaded] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     plan_type: "weekly",
     start_date: new Date().toISOString().split("T")[0],
   });
-  const [selectedMealTypes, setSelectedMealTypes] = useState<string[]>(["ranajky", "hlavne_jedlo", "vecera"]);
+  const [selectedMealTypes, setSelectedMealTypes] = useState<string[]>(DEFAULT_MEAL_TYPES);
   const [planData, setPlanData] = useState<any>({});
+  const [openPopovers, setOpenPopovers] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (open) {
-      fetchRecipes();
-      if (plan) {
-        setFormData({
-          name: plan.name,
-          plan_type: plan.plan_type,
-          start_date: plan.start_date,
-        });
-        setSelectedMealTypes(plan.plan_data?.meal_types || ["ranajky", "hlavne_jedlo", "vecera"]);
-        setPlanData(plan.plan_data || {});
-      } else {
-        resetForm();
-      }
+      // Reset state when dialog opens
+      setRecipesLoaded(false);
+      
+      // Load recipes first
+      fetchRecipes().then(() => {
+        setRecipesLoaded(true);
+        
+        // Then load plan data after recipes are loaded
+        if (plan) {
+          setFormData({
+            name: plan.name,
+            plan_type: plan.plan_type,
+            start_date: plan.start_date,
+          });
+          const normalizedTypes = normalizeMealTypes(plan.plan_data?.meal_types || DEFAULT_MEAL_TYPES);
+          setSelectedMealTypes(normalizedTypes);
+          
+          // Migrate old keys to new format while preserving all data
+          const migratedData = migratePlanDataKeys(plan.plan_data || {});
+          setPlanData(migratedData);
+        } else {
+          resetForm();
+        }
+      });
+    } else {
+      // Reset when dialog closes
+      setRecipesLoaded(false);
+      setRecipes([]);
+      setOpenPopovers({});
     }
   }, [plan, open]);
 
@@ -81,16 +152,28 @@ const MealPlanDialog = ({ open, onOpenChange, plan, onSuccess }: MealPlanDialogP
       plan_type: "weekly",
       start_date: new Date().toISOString().split("T")[0],
     });
-    setSelectedMealTypes(["ranajky", "hlavne_jedlo", "vecera"]);
+    setSelectedMealTypes(DEFAULT_MEAL_TYPES);
     setPlanData({});
   };
 
   const fetchRecipes = async () => {
-    const { data } = await supabase
-      .from("recipes")
-      .select("id, name, category")
-      .order("name");
-    setRecipes(data || []);
+    try {
+      const { data, error } = await supabase
+        .from("recipes")
+        .select("id, name, category")
+        .order("name");
+      
+      if (error) {
+        console.error("Error fetching recipes:", error);
+        setRecipes([]);
+        return;
+      }
+      
+      setRecipes(data || []);
+    } catch (error) {
+      console.error("Error fetching recipes:", error);
+      setRecipes([]);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -118,13 +201,32 @@ const MealPlanDialog = ({ open, onOpenChange, plan, onSuccess }: MealPlanDialogP
       return;
     }
 
+    // Migrate old keys to new format, but preserve all existing data
+    const normalizedPlanData = migratePlanDataKeys(planData);
+    
+    // Clean up any keys that reference meal types that are no longer selected
+    const cleanedPlanData: Record<string, any> = {};
+    Object.entries(normalizedPlanData).forEach(([key, value]) => {
+      // Keep only keys for selected meal types
+      const keyParts = key.split('_');
+      if (keyParts.length >= 3 && keyParts[0] === 'day') {
+        const mealType = keyParts.slice(2).join('_');
+        if (selectedMealTypes.includes(mealType)) {
+          cleanedPlanData[key] = value;
+        }
+      } else {
+        // Keep non-day keys (like meal_types if it exists)
+        cleanedPlanData[key] = value;
+      }
+    });
+
     const mealPlanData = {
       user_id: user.id,
       name: formData.name,
       plan_type: formData.plan_type,
       meals_per_day: selectedMealTypes.length,
       start_date: formData.start_date,
-      plan_data: { ...planData, meal_types: selectedMealTypes },
+      plan_data: { ...cleanedPlanData, meal_types: selectedMealTypes },
     };
 
     let error;
@@ -200,11 +302,13 @@ const MealPlanDialog = ({ open, onOpenChange, plan, onSuccess }: MealPlanDialogP
   };
 
   const getActiveMealTypes = () => {
-    return selectedMealTypes;
+    const orderedIds = MEAL_TYPE_OPTIONS.map((option) => option.id);
+    return orderedIds.filter((id) => selectedMealTypes.includes(id));
   };
 
   const setMealForDay = (day: number, mealType: string, recipeId: string | null) => {
-    const key = `day_${day}_${mealType}`;
+    const normalizedMealType = normalizeMealType(mealType);
+    const key = `day_${day}_${normalizedMealType}`;
     setPlanData((prev: any) => ({
       ...prev,
       [key]: recipeId,
@@ -212,8 +316,25 @@ const MealPlanDialog = ({ open, onOpenChange, plan, onSuccess }: MealPlanDialogP
   };
 
   const getMealForDay = (day: number, mealType: string): string => {
-    const key = `day_${day}_${mealType}`;
-    return planData[key] || "none";
+    const normalizedMealType = normalizeMealType(mealType);
+    const key = `day_${day}_${normalizedMealType}`;
+    const value = planData[key];
+    
+    // Return "none" if value is null, undefined, empty string, or "none"
+    if (!value || value === "none" || value === "") {
+      return "none";
+    }
+    
+    // Verify that the recipe still exists in recipes list
+    if (recipesLoaded && recipes.length > 0) {
+      const recipeExists = recipes.some(r => r.id === value);
+      if (!recipeExists) {
+        // Recipe was deleted, return "none"
+        return "none";
+      }
+    }
+    
+    return value;
   };
 
   const toggleMealType = (mealTypeId: string) => {
@@ -290,12 +411,14 @@ const MealPlanDialog = ({ open, onOpenChange, plan, onSuccess }: MealPlanDialogP
     
     // Slovak meal type names (sanitized)
     const mealTypeLabels: Record<string, string> = {
-      "ranajky": "Ranajky",
-      "desiata": "Desiata",
+      "ranajky": "Raňajky",
+      "snack": "Snack",
       "polievka": "Polievka",
       "hlavne_jedlo": "Hlavne jedlo",
-      "dezert": "Dezert",
-      "vecera": "Vecera"
+      "vecera": "Večera",
+      // Legacy labels
+      "desiata": "Snack",
+      "dezert": "Snack",
     };
     
     for (let day = 1; day <= daysCount; day++) {
@@ -381,40 +504,117 @@ const MealPlanDialog = ({ open, onOpenChange, plan, onSuccess }: MealPlanDialogP
     const daysCount = getDaysCount();
     const activeMealTypes = getActiveMealTypes();
 
+    // Don't render until recipes are loaded
+    if (!recipesLoaded) {
+      return (
+        <div className="space-y-4">
+          <h3 className="font-semibold">Plánovanie jedál</h3>
+          <div className="text-center py-8 text-muted-foreground">
+            Načítavam recepty...
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="space-y-4">
         <h3 className="font-semibold">Plánovanie jedál</h3>
-        <div className="space-y-3">
+        <div className="space-y-4">
           {activeMealTypes.map((mealType) => {
             const mealOption = MEAL_TYPE_OPTIONS.find(opt => opt.id === mealType);
             return (
               <Card key={mealType}>
                 <CardContent className="p-4">
-                  <Label className="mb-2 block font-medium">
+                  <Label className="mb-4 block text-base font-semibold">
                     {mealOption?.label || mealType}
                   </Label>
-                  <div className="grid grid-cols-7 gap-2">
-                    {Array.from({ length: daysCount }).map((_, dayIndex) => (
-                      <div key={dayIndex} className="space-y-1">
-                        <Label className="text-xs">{dayIndex + 1}</Label>
-                        <Select
-                          value={getMealForDay(dayIndex + 1, mealType)}
-                          onValueChange={(value) => setMealForDay(dayIndex + 1, mealType, value === "none" ? null : value)}
-                        >
-                          <SelectTrigger className="h-8 text-xs">
-                            <SelectValue placeholder="-" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="none">Žiadne</SelectItem>
-                            {recipes.map((recipe) => (
-                              <SelectItem key={recipe.id} value={recipe.id}>
-                                {recipe.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    ))}
+                  <div className="space-y-3">
+                    {Array.from({ length: daysCount }).map((_, dayIndex) => {
+                      const dayDate = addDays(new Date(formData.start_date), dayIndex);
+                      const dayName = format(dayDate, "EEEE", { locale: sk });
+                      const dayLabel = capitalize(dayName);
+                      const dateStr = format(dayDate, "dd.MM.yyyy");
+                      const currentValue = getMealForDay(dayIndex + 1, mealType);
+                      const selectedRecipe = recipes.find(r => r.id === currentValue);
+                      const popoverKey = `${mealType}_${dayIndex}`;
+                      const isOpen = openPopovers[popoverKey] || false;
+
+                      return (
+                        <div key={dayIndex} className="flex flex-col space-y-2">
+                          <div className="flex items-center gap-2">
+                            <Label className="text-sm font-medium min-w-[120px]">
+                              {dayLabel}
+                            </Label>
+                            <span className="text-xs text-muted-foreground">
+                              {dateStr}
+                            </span>
+                          </div>
+                          <Popover 
+                            open={isOpen} 
+                            onOpenChange={(open) => {
+                              setOpenPopovers(prev => ({ ...prev, [popoverKey]: open }));
+                            }}
+                          >
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                role="combobox"
+                                aria-expanded={isOpen}
+                                className="w-full justify-between text-sm font-normal"
+                              >
+                                <span className="truncate">
+                                  {selectedRecipe ? selectedRecipe.name : currentValue === "none" ? "Žiadne" : "Vyberte recept..."}
+                                </span>
+                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                              <Command>
+                                <CommandInput placeholder="Hľadať recept..." className="h-9" />
+                                <CommandList>
+                                  <CommandEmpty>Nenašli sa žiadne recepty.</CommandEmpty>
+                                  <CommandGroup>
+                                    <CommandItem
+                                      value="none"
+                                      onSelect={() => {
+                                        setMealForDay(dayIndex + 1, mealType, null);
+                                        setOpenPopovers(prev => ({ ...prev, [popoverKey]: false }));
+                                      }}
+                                    >
+                                      <Check
+                                        className={cn(
+                                          "mr-2 h-4 w-4",
+                                          currentValue === "none" ? "opacity-100" : "opacity-0"
+                                        )}
+                                      />
+                                      Žiadne
+                                    </CommandItem>
+                                    {recipes.map((recipe) => (
+                                      <CommandItem
+                                        key={recipe.id}
+                                        value={recipe.name}
+                                        onSelect={() => {
+                                          setMealForDay(dayIndex + 1, mealType, recipe.id);
+                                          setOpenPopovers(prev => ({ ...prev, [popoverKey]: false }));
+                                        }}
+                                      >
+                                        <Check
+                                          className={cn(
+                                            "mr-2 h-4 w-4",
+                                            currentValue === recipe.id ? "opacity-100" : "opacity-0"
+                                          )}
+                                        />
+                                        <span className="whitespace-normal break-words">{recipe.name}</span>
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                </CommandList>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                      );
+                    })}
                   </div>
                 </CardContent>
               </Card>
@@ -427,7 +627,7 @@ const MealPlanDialog = ({ open, onOpenChange, plan, onSuccess }: MealPlanDialogP
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{plan ? "Upraviť jedálniček" : "Nový jedálniček"}</DialogTitle>
           <DialogDescription>

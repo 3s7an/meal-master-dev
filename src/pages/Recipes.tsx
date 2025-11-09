@@ -9,6 +9,7 @@ import { Plus, Search, Clock, Users, BookmarkMinus, User } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import RecipeDialog from "@/components/RecipeDialog";
+import { CATEGORY_OPTIONS, getCategoryOption, normalizeCategory } from "@/constants/categories";
 
 interface Recipe {
   id: string;
@@ -46,12 +47,7 @@ const Recipes = () => {
   const [selectedSavedRecipe, setSelectedSavedRecipe] = useState<UserRecipe | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
-  const categories = [
-    { value: "breakfast", label: "Raňajky", color: "bg-accent" },
-    { value: "lunch", label: "Obed", color: "bg-primary" },
-    { value: "dinner", label: "Večera", color: "bg-secondary" },
-    { value: "snack", label: "Snack", color: "bg-muted" },
-  ];
+  const categories = CATEGORY_OPTIONS;
 
   useEffect(() => {
     fetchRecipes();
@@ -108,6 +104,7 @@ const Recipes = () => {
       const ownRecipes: UserRecipe[] =
         (ownData || []).map((recipe) => ({
           ...recipe,
+          category: normalizeCategory(recipe.category),
           source: "own" as const,
           author_name: null, // Vlastné recepty - zobrazíme "Ja"
         })) ?? [];
@@ -118,8 +115,10 @@ const Recipes = () => {
             if (!entry.recipes) return null;
             const recipe = entry.recipes;
             const authorName = recipe.profiles?.full_name || null;
+            const normalizedCategory = normalizeCategory(recipe.category);
             return {
               ...recipe,
+              category: normalizedCategory,
               source: "saved" as RecipeSource,
               saved_at: entry.created_at as string | undefined,
               author_name: authorName,
@@ -345,18 +344,19 @@ const Recipes = () => {
               <CardHeader>
                 <div className="flex items-start justify-between gap-2">
                   <CardTitle className="line-clamp-1">{recipe.name}</CardTitle>
-                  <div className="flex items-center gap-2">
-                    {recipe.source === "saved" && (
-                      <Badge variant="secondary">Uložené</Badge>
-                    )}
-                    <Badge
-                      className={
-                        categories.find((c) => c.value === recipe.category)?.color
-                      }
-                    >
-                      {categories.find((c) => c.value === recipe.category)?.label}
-                    </Badge>
-                  </div>
+                    <div className="flex items-center gap-2">
+                      {recipe.source === "saved" && (
+                        <Badge variant="secondary">Uložené</Badge>
+                      )}
+                      {(() => {
+                        const option = getCategoryOption(recipe.category);
+                        return (
+                          <Badge className={option.badgeClass}>
+                            {option.label}
+                          </Badge>
+                        );
+                      })()}
+                    </div>
                 </div>
                 <CardDescription className="line-clamp-2">
                   {recipe.description}
@@ -426,13 +426,11 @@ const Recipes = () => {
             {selectedSavedRecipe && (
               <DialogDescription>
                 <div className="flex items-center gap-2 flex-wrap">
-                  <Badge
-                    className={
-                      categories.find((c) => c.value === selectedSavedRecipe.category)?.color
-                    }
-                  >
-                    {categories.find((c) => c.value === selectedSavedRecipe.category)?.label}
-                  </Badge>
+                  {selectedSavedRecipe && (
+                    <Badge className={getCategoryOption(selectedSavedRecipe.category).badgeClass}>
+                      {getCategoryOption(selectedSavedRecipe.category).label}
+                    </Badge>
+                  )}
                   <Badge variant="secondary">Uložené</Badge>
                   {selectedSavedRecipe.user_id && (
                     <div className="flex items-center gap-1 text-sm text-muted-foreground">
