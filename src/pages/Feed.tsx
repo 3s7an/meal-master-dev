@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Search, Heart, Plus, Minus, TrendingUp, Clock, User } from "lucide-react";
 import { format } from "date-fns";
@@ -331,43 +331,16 @@ const Feed = () => {
                   </div>
                 )}
               </div>
-              <CardHeader className="p-4 pb-3 space-y-2">
+              <div className="flex flex-1 flex-col p-4 gap-2">
                 <div className="flex items-start justify-between gap-2">
-                  <CardTitle className="line-clamp-1">{recipe.name}</CardTitle>
                   {(() => {
                     const option = getCategoryOption(recipe.category);
                     return (
-                      <Badge className={option.badgeClass}>
+                      <Badge className={`${option.badgeClass} whitespace-nowrap`}>
                         {option.label}
                       </Badge>
                     );
                   })()}
-                </div>
-                <CardDescription className="text-sm text-muted-foreground line-clamp-2">
-                  {recipe.description}
-                </CardDescription>
-                <div className="flex flex-col gap-1 mt-1 text-xs text-muted-foreground">
-                  {recipe.author_name && (
-                    <div className="flex items-center gap-1">
-                      <User className="w-3 h-3" />
-                      <span>
-                        {recipe.user_id === currentUserId ? "Ja" : recipe.author_name}
-                      </span>
-                    </div>
-                  )}
-                  {recipe.created_at && (
-                    <div>
-                      {format(new Date(recipe.created_at), "d.M.yyyy")}
-                    </div>
-                  )}
-                </div>
-              </CardHeader>
-              <CardContent className="p-4 pt-0">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                    <span>{recipe.ingredients?.length || 0} ingrediencií</span>
-                    {recipe.calories && <span>{recipe.calories} kcal</span>}
-                  </div>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -378,7 +351,34 @@ const Feed = () => {
                     <span>{recipe.likes_count || 0}</span>
                   </Button>
                 </div>
-              </CardContent>
+                <CardDescription className="text-sm text-muted-foreground line-clamp-2">
+                  {recipe.description}
+                </CardDescription>
+                <div className="flex flex-col gap-1 text-xs text-muted-foreground">
+                  {recipe.calories && <span>{recipe.calories} kcal</span>}
+                </div>
+                <div className="mt-auto space-y-1">
+                  <CardTitle className="font-semibold leading-tight break-words">
+                    {recipe.name}
+                  </CardTitle>
+                  {recipe.created_at && (
+                    <div className="text-xs text-muted-foreground">
+                      {format(new Date(recipe.created_at), "d.M.yyyy")}
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span>{recipe.ingredients?.length || 0} ingrediencií</span>
+                    {recipe.author_name && (
+                      <span className="flex items-center gap-1">
+                        <User className="w-3 h-3" />
+                        <span>
+                          {recipe.user_id === currentUserId ? "Ja" : recipe.author_name}
+                        </span>
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
             </Card>
           ))}
         </div>
