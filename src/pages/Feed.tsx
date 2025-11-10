@@ -315,21 +315,23 @@ const Feed = () => {
           {filteredRecipes.map((recipe) => (
             <Card
               key={recipe.id}
-              className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
+              className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer flex flex-col"
               onClick={() => handleRecipeClick(recipe)}
             >
-              <div className="h-48 bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center">
+              <div className="relative w-full aspect-[9/7] overflow-hidden bg-gradient-to-br from-primary/20 to-secondary/20">
                 {recipe.image_url ? (
                   <img
                     src={recipe.image_url}
                     alt={recipe.name}
-                    className="w-full h-full object-cover"
+                    className="absolute inset-0 w-full h-full object-cover"
                   />
                 ) : (
-                  <Clock className="w-16 h-16 text-muted-foreground" />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <Clock className="w-16 h-16 text-muted-foreground" />
+                  </div>
                 )}
               </div>
-              <CardHeader>
+              <CardHeader className="p-4 pb-3 space-y-2">
                 <div className="flex items-start justify-between gap-2">
                   <CardTitle className="line-clamp-1">{recipe.name}</CardTitle>
                   {(() => {
@@ -341,12 +343,12 @@ const Feed = () => {
                     );
                   })()}
                 </div>
-                <CardDescription className="line-clamp-2">
+                <CardDescription className="text-sm text-muted-foreground line-clamp-2">
                   {recipe.description}
                 </CardDescription>
-                <div className="flex flex-col gap-1 mt-2">
+                <div className="flex flex-col gap-1 mt-1 text-xs text-muted-foreground">
                   {recipe.author_name && (
-                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <div className="flex items-center gap-1">
                       <User className="w-3 h-3" />
                       <span>
                         {recipe.user_id === currentUserId ? "Ja" : recipe.author_name}
@@ -354,15 +356,15 @@ const Feed = () => {
                     </div>
                   )}
                   {recipe.created_at && (
-                    <div className="text-xs text-muted-foreground">
+                    <div>
                       {format(new Date(recipe.created_at), "d.M.yyyy")}
                     </div>
                   )}
                 </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-4 pt-0">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                  <div className="flex items-center gap-3 text-sm text-muted-foreground">
                     <span>{recipe.ingredients?.length || 0} ingrediencií</span>
                     {recipe.calories && <span>{recipe.calories} kcal</span>}
                   </div>
