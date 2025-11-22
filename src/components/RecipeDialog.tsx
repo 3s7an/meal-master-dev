@@ -391,7 +391,7 @@ const RecipeDialog = ({ open, onOpenChange, recipe, onSuccess }: RecipeDialogPro
                   <img
                     src={imagePreview}
                     alt="Preview"
-                    className="w-full h-48 object-cover rounded-lg border"
+                    className="w-full h-64 md:h-80 object-cover rounded-lg border"
                   />
                   <Button
                     type="button"

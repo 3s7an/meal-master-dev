@@ -476,7 +476,7 @@ const Feed = () => {
           {selectedRecipe && (
             <div className="space-y-6 w-full max-w-full overflow-x-hidden">
               {selectedRecipe.image_url && (
-                <div className="relative w-full aspect-video overflow-hidden rounded-lg bg-gradient-to-br from-primary/20 to-secondary/20">
+                <div className="relative w-full aspect-[4/3] md:aspect-[3/2] overflow-hidden rounded-lg bg-gradient-to-br from-primary/20 to-secondary/20">
                   <img
                     src={selectedRecipe.image_url}
                     alt={selectedRecipe.name}
