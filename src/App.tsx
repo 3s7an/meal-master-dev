@@ -8,6 +8,7 @@ import Recipes from "./pages/Recipes";
 import Feed from "./pages/Feed";
 import ShoppingList from "./pages/ShoppingList";
 import MealPlans from "./pages/MealPlans";
+import Profile from "./pages/Profile";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 
@@ -25,6 +26,7 @@ const App = () => (
           <Route path="/feed" element={<Layout><Feed /></Layout>} />
           <Route path="/shopping-list" element={<Layout><ShoppingList /></Layout>} />
           <Route path="/meal-plans" element={<Layout><MealPlans /></Layout>} />
+          <Route path="/profile" element={<Layout><Profile /></Layout>} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

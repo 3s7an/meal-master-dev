@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, Calendar as CalendarIcon, Trash2, Edit, Download } from "lucide-react";
+import { Plus, Calendar as CalendarIcon, Trash2, Edit, Download, ShoppingCart } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import MealPlanDialog from "@/components/MealPlanDialog";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
@@ -431,6 +431,139 @@ const MealPlans = () => {
     }
   };
 
+  const generateShoppingList = async (plan: MealPlan) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast({
+          title: "Chyba",
+          description: "Musíte byť prihlásený.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const daysCount = plan.plan_type === "weekly" ? 7 : 30;
+      const normalizedMealTypes = normalizeMealTypes(plan.plan_data?.meal_types || FALLBACK_MEAL_TYPES);
+      const activeMealTypes = FALLBACK_MEAL_TYPES.filter((type) => normalizedMealTypes.includes(type));
+      const planData = migratePlanDataKeys(plan.plan_data || {});
+
+      // Zbieranie všetkých recipe IDs z plánu
+      const recipeIds = new Set<string>();
+      for (let day = 1; day <= daysCount; day++) {
+        activeMealTypes.forEach((mealType: string) => {
+          const normalizedMealType = normalizeMealType(mealType);
+          const key = `day_${day}_${normalizedMealType}`;
+          const recipeId = planData[key];
+          if (recipeId && recipeId !== "none") {
+            recipeIds.add(recipeId);
+          }
+        });
+      }
+
+      if (recipeIds.size === 0) {
+        toast({
+          title: "Upozornenie",
+          description: "Jedálny plán neobsahuje žiadne recepty.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Načítanie receptov s ingredienciami
+      const { data: recipesData, error: recipesError } = await supabase
+        .from("recipes")
+        .select("id, name, ingredients")
+        .in("id", Array.from(recipeIds));
+
+      if (recipesError) {
+        toast({
+          title: "Chyba",
+          description: "Nepodarilo sa načítať recepty.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Zoskupenie a sčítanie ingrediencií
+      interface IngredientGroup {
+        name: string;
+        quantity: number;
+        unit: string;
+      }
+
+      const ingredientMap = new Map<string, IngredientGroup>();
+
+      recipesData?.forEach((recipe: any) => {
+        const ingredients = recipe.ingredients || [];
+        if (Array.isArray(ingredients)) {
+          ingredients.forEach((ing: any) => {
+            if (ing.name && ing.name.trim()) {
+              const normalizedName = ing.name.trim().toLowerCase();
+              const unit = (ing.unit || "").trim().toLowerCase();
+              const key = `${normalizedName}_${unit}`;
+              const quantity = parseFloat(ing.quantity) || 0;
+
+              if (ingredientMap.has(key)) {
+                const existing = ingredientMap.get(key)!;
+                existing.quantity += quantity;
+              } else {
+                ingredientMap.set(key, {
+                  name: ing.name.trim(),
+                  quantity: quantity,
+                  unit: ing.unit || "",
+                });
+              }
+            }
+          });
+        }
+      });
+
+      if (ingredientMap.size === 0) {
+        toast({
+          title: "Upozornenie",
+          description: "Recepty v pláne nemajú žiadne ingrediencie.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Vytvorenie položiek v nákupnom zozname
+      const shoppingItems = Array.from(ingredientMap.values()).map((ing) => ({
+        user_id: user.id,
+        item_name: ing.name,
+        quantity: ing.quantity > 0 ? ing.quantity : null,
+        unit: ing.unit || null,
+        is_checked: false,
+      }));
+
+      const { error: insertError } = await supabase
+        .from("shopping_list")
+        .insert(shoppingItems);
+
+      if (insertError) {
+        toast({
+          title: "Chyba",
+          description: insertError.message,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      toast({
+        title: "Nákupný zoznam vytvorený",
+        description: `Bolo pridaných ${shoppingItems.length} položiek do nákupného zoznamu.`,
+      });
+    } catch (error) {
+      console.error("Error generating shopping list:", error);
+      toast({
+        title: "Chyba",
+        description: "Nepodarilo sa vytvoriť nákupný zoznam.",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="space-y-8">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -493,22 +626,32 @@ const MealPlans = () => {
                   <CalendarIcon className="w-4 h-4" />
                   <span>Od {new Date(plan.start_date).toLocaleDateString("sk-SK")}</span>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-col gap-2">
+                  <div className="flex gap-2">
+                    <Button 
+                      className="flex-1" 
+                      variant="outline" 
+                      onClick={() => exportMealPlan(plan)}
+                    >
+                      <Download className="w-4 h-4 mr-2" />
+                      Export
+                    </Button>
+                    <Button 
+                      className="flex-1" 
+                      variant="outline" 
+                      onClick={() => handleEditPlan(plan)}
+                    >
+                      <Edit className="w-4 h-4 mr-2" />
+                      Upraviť
+                    </Button>
+                  </div>
                   <Button 
-                    className="flex-1" 
-                    variant="outline" 
-                    onClick={() => exportMealPlan(plan)}
+                    className="w-full" 
+                    variant="default" 
+                    onClick={() => generateShoppingList(plan)}
                   >
-                    <Download className="w-4 h-4 mr-2" />
-                    Export
-                  </Button>
-                  <Button 
-                    className="flex-1" 
-                    variant="outline" 
-                    onClick={() => handleEditPlan(plan)}
-                  >
-                    <Edit className="w-4 h-4 mr-2" />
-                    Upraviť
+                    <ShoppingCart className="w-4 h-4 mr-2" />
+                    Vytvoriť nákupný zoznam
                   </Button>
                 </div>
               </CardContent>

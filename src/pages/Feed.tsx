@@ -144,23 +144,84 @@ const Feed = () => {
     const recipe = recipes.find(r => r.id === recipeId);
     if (!recipe) return;
 
-    if (recipe.is_liked) {
+    // Optimistic update - okamžite aktualizuj UI
+    const wasLiked = recipe.is_liked;
+    const newLikesCount = wasLiked 
+      ? (recipe.likes_count || 0) - 1 
+      : (recipe.likes_count || 0) + 1;
+
+    setRecipes(prev => prev.map(r => 
+      r.id === recipeId 
+        ? { ...r, is_liked: !wasLiked, likes_count: newLikesCount }
+        : r
+    ));
+    setFilteredRecipes(prev => prev.map(r => 
+      r.id === recipeId 
+        ? { ...r, is_liked: !wasLiked, likes_count: newLikesCount }
+        : r
+    ));
+
+    // Aktualizuj aj selectedRecipe ak je otvorený
+    if (selectedRecipe?.id === recipeId) {
+      setSelectedRecipe(prev => prev ? {
+        ...prev,
+        is_liked: !wasLiked,
+        likes_count: newLikesCount
+      } : null);
+    }
+
+    // Potom aktualizuj databázu
+    if (wasLiked) {
       const { error } = await supabase
         .from("recipe_likes")
         .delete()
         .eq("recipe_id", recipeId)
         .eq("user_id", user.id);
 
-      if (!error) {
-        fetchRecipes();
+      if (error) {
+        // Rollback pri chybe
+        setRecipes(prev => prev.map(r => 
+          r.id === recipeId 
+            ? { ...r, is_liked: wasLiked, likes_count: recipe.likes_count || 0 }
+            : r
+        ));
+        setFilteredRecipes(prev => prev.map(r => 
+          r.id === recipeId 
+            ? { ...r, is_liked: wasLiked, likes_count: recipe.likes_count || 0 }
+            : r
+        ));
+        if (selectedRecipe?.id === recipeId) {
+          setSelectedRecipe(prev => prev ? {
+            ...prev,
+            is_liked: wasLiked,
+            likes_count: recipe.likes_count || 0
+          } : null);
+        }
       }
     } else {
       const { error } = await supabase
         .from("recipe_likes")
         .insert({ recipe_id: recipeId, user_id: user.id });
 
-      if (!error) {
-        fetchRecipes();
+      if (error) {
+        // Rollback pri chybe
+        setRecipes(prev => prev.map(r => 
+          r.id === recipeId 
+            ? { ...r, is_liked: wasLiked, likes_count: recipe.likes_count || 0 }
+            : r
+        ));
+        setFilteredRecipes(prev => prev.map(r => 
+          r.id === recipeId 
+            ? { ...r, is_liked: wasLiked, likes_count: recipe.likes_count || 0 }
+            : r
+        ));
+        if (selectedRecipe?.id === recipeId) {
+          setSelectedRecipe(prev => prev ? {
+            ...prev,
+            is_liked: wasLiked,
+            likes_count: recipe.likes_count || 0
+          } : null);
+        }
       }
     }
   };
@@ -414,6 +475,15 @@ const Feed = () => {
 
           {selectedRecipe && (
             <div className="space-y-6">
+              {selectedRecipe.image_url && (
+                <div className="relative w-full aspect-video overflow-hidden rounded-lg bg-gradient-to-br from-primary/20 to-secondary/20">
+                  <img
+                    src={selectedRecipe.image_url}
+                    alt={selectedRecipe.name}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              )}
               <div>
                 <Label>Popis</Label>
                 <p className="text-sm text-muted-foreground mt-1">{selectedRecipe.description}</p>

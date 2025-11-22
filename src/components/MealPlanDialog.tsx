@@ -520,35 +520,36 @@ const MealPlanDialog = ({ open, onOpenChange, plan, onSuccess }: MealPlanDialogP
       <div className="space-y-4">
         <h3 className="font-semibold">Plánovanie jedál</h3>
         <div className="space-y-4">
-          {activeMealTypes.map((mealType) => {
-            const mealOption = MEAL_TYPE_OPTIONS.find(opt => opt.id === mealType);
+          {Array.from({ length: daysCount }).map((_, dayIndex) => {
+            const dayDate = addDays(new Date(formData.start_date), dayIndex);
+            const dayName = format(dayDate, "EEEE", { locale: sk });
+            const dayLabel = capitalize(dayName);
+            const dateStr = format(dayDate, "dd.MM.yyyy");
+
             return (
-              <Card key={mealType}>
+              <Card key={dayIndex}>
                 <CardContent className="p-4">
-                  <Label className="mb-4 block text-base font-semibold">
-                    {mealOption?.label || mealType}
-                  </Label>
-                  <div className="space-y-3">
-                    {Array.from({ length: daysCount }).map((_, dayIndex) => {
-                      const dayDate = addDays(new Date(formData.start_date), dayIndex);
-                      const dayName = format(dayDate, "EEEE", { locale: sk });
-                      const dayLabel = capitalize(dayName);
-                      const dateStr = format(dayDate, "dd.MM.yyyy");
+                  <div className="mb-4 pb-3 border-b">
+                    <Label className="text-base font-semibold block mb-1">
+                      {dayLabel}
+                    </Label>
+                    <span className="text-sm text-muted-foreground">
+                      {dateStr}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {activeMealTypes.map((mealType) => {
+                      const mealOption = MEAL_TYPE_OPTIONS.find(opt => opt.id === mealType);
                       const currentValue = getMealForDay(dayIndex + 1, mealType);
                       const selectedRecipe = recipes.find(r => r.id === currentValue);
                       const popoverKey = `${mealType}_${dayIndex}`;
                       const isOpen = openPopovers[popoverKey] || false;
 
                       return (
-                        <div key={dayIndex} className="flex flex-col space-y-2">
-                          <div className="flex items-center gap-2">
-                            <Label className="text-sm font-medium min-w-[120px]">
-                              {dayLabel}
-                            </Label>
-                            <span className="text-xs text-muted-foreground">
-                              {dateStr}
-                            </span>
-                          </div>
+                        <div key={mealType} className="space-y-2">
+                          <Label className="text-sm font-medium">
+                            {mealOption?.label || mealType}
+                          </Label>
                           <Popover 
                             open={isOpen} 
                             onOpenChange={(open) => {

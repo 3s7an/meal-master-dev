@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Trash2, Download } from "lucide-react";
+import { Plus, Trash2, Download, CheckSquare, Square, X, Search } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 
@@ -21,8 +21,11 @@ const ShoppingList = () => {
   const { toast } = useToast();
   const [items, setItems] = useState<ShoppingItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [newItem, setNewItem] = useState({ name: "", quantity: "1", unit: "" });
+  const [newItem, setNewItem] = useState({ name: "", quantity: "" });
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+  const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
     checkAuth();
@@ -77,11 +80,30 @@ const ShoppingList = () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
+    // Parsovanie quantity - ak je to len číslo, uložíme ho do quantity, inak celý text do unit
+    let quantityValue: number | null = null;
+    let unitValue: string | null = null;
+
+    if (newItem.quantity.trim()) {
+      const trimmedQuantity = newItem.quantity.trim();
+      // Skúsime parsovať ako číslo
+      const parsedNumber = parseFloat(trimmedQuantity);
+      if (!isNaN(parsedNumber) && trimmedQuantity === parsedNumber.toString()) {
+        // Je to len číslo
+        quantityValue = parsedNumber;
+        unitValue = null;
+      } else {
+        // Je to text (napr. "2ks", "200g", "20dag")
+        quantityValue = null;
+        unitValue = trimmedQuantity;
+      }
+    }
+
     const { error } = await supabase.from("shopping_list").insert({
       user_id: user.id,
       item_name: newItem.name,
-      quantity: newItem.quantity ? parseFloat(newItem.quantity) : null,
-      unit: newItem.unit || null,
+      quantity: quantityValue,
+      unit: unitValue,
       is_checked: false,
     });
 
@@ -92,7 +114,7 @@ const ShoppingList = () => {
         variant: "destructive",
       });
     } else {
-      setNewItem({ name: "", quantity: "1", unit: "" });
+      setNewItem({ name: "", quantity: "" });
       fetchItems();
     }
   };
@@ -166,6 +188,71 @@ const ShoppingList = () => {
       fetchItems();
     }
   };
+
+  const toggleSelection = (id: string) => {
+    setSelectedItems(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      return newSet;
+    });
+  };
+
+  const selectAll = () => {
+    const itemsToSelect = searchTerm ? filteredItems : items;
+    setSelectedItems(new Set(itemsToSelect.map(item => item.id)));
+  };
+
+  const deselectAll = () => {
+    setSelectedItems(new Set());
+  };
+
+  const deleteSelected = async () => {
+    if (selectedItems.size === 0) return;
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { error } = await supabase
+      .from("shopping_list")
+      .delete()
+      .in("id", Array.from(selectedItems))
+      .eq("user_id", user.id);
+
+    if (error) {
+      toast({
+        title: "Chyba",
+        description: error.message,
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Vymazané",
+        description: `Bolo odstránených ${selectedItems.size} položiek.`,
+      });
+      setSelectedItems(new Set());
+      setSelectionMode(false);
+      fetchItems();
+    }
+  };
+
+  const exitSelectionMode = () => {
+    setSelectionMode(false);
+    setSelectedItems(new Set());
+  };
+
+  const filteredItems = items.filter((item) => {
+    if (!searchTerm) return true;
+    const searchLower = searchTerm.toLowerCase();
+    return (
+      item.item_name.toLowerCase().includes(searchLower) ||
+      (item.unit && item.unit.toLowerCase().includes(searchLower)) ||
+      (item.quantity && item.quantity.toString().includes(searchLower))
+    );
+  });
 
   const exportList = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -436,59 +523,130 @@ const ShoppingList = () => {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-4xl font-bold mb-2">Nákupný zoznam</h1>
-          <p className="text-muted-foreground">Spravujte položky na nákup</p>
+          <p className="text-muted-foreground">
+            {selectionMode 
+              ? `Režim výberu: ${selectedItems.size} ${selectedItems.size === 1 ? 'položka vybraná' : selectedItems.size < 5 ? 'položky vybrané' : 'položiek vybraných'}`
+              : "Spravujte položky na nákup"
+            }
+          </p>
         </div>
         {isAuthenticated && (
           <div className="flex gap-2">
-            <Button variant="outline" onClick={exportList} disabled={items.length === 0}>
-              <Download className="w-4 h-4 mr-2" />
-              Export
-            </Button>
-            <Button
-              variant="outline"
-              onClick={clearChecked}
-              disabled={!items.some(i => i.is_checked)}
-            >
-              <Trash2 className="w-4 h-4 mr-2" />
-              Vymazať nakúpené
-            </Button>
+            {selectionMode ? (
+              <>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    const itemsToCheck = searchTerm ? filteredItems : items;
+                    const allSelected = itemsToCheck.length > 0 && itemsToCheck.every(item => selectedItems.has(item.id));
+                    if (allSelected) {
+                      deselectAll();
+                    } else {
+                      selectAll();
+                    }
+                  }}
+                >
+                  {(() => {
+                    const itemsToCheck = searchTerm ? filteredItems : items;
+                    const allSelected = itemsToCheck.length > 0 && itemsToCheck.every(item => selectedItems.has(item.id));
+                    return allSelected;
+                  })() ? (
+                    <>
+                      <Square className="w-4 h-4 mr-2" />
+                      Zrušiť výber
+                    </>
+                  ) : (
+                    <>
+                      <CheckSquare className="w-4 h-4 mr-2" />
+                      Vybrať všetko
+                    </>
+                  )}
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={deleteSelected}
+                  disabled={selectedItems.size === 0}
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Vymazať ({selectedItems.size})
+                </Button>
+                <Button variant="outline" onClick={exitSelectionMode}>
+                  <X className="w-4 h-4 mr-2" />
+                  Zrušiť
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button variant="outline" onClick={exportList} disabled={items.length === 0}>
+                  <Download className="w-4 h-4 mr-2" />
+                  Export
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={clearChecked}
+                  disabled={!items.some(i => i.is_checked)}
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Vymazať nakúpené
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setSelectionMode(true)}
+                  disabled={items.length === 0}
+                >
+                  <CheckSquare className="w-4 h-4 mr-2" />
+                  Vybrať
+                </Button>
+              </>
+            )}
           </div>
         )}
       </div>
 
       {isAuthenticated && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Pridať položku</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex gap-2">
-              <Input
-                placeholder="Názov položky"
-                value={newItem.name}
-                onChange={(e) => setNewItem({ ...newItem, name: e.target.value })}
-                onKeyPress={(e) => e.key === "Enter" && addItem()}
-                className="flex-1"
-              />
-              <Input
-                placeholder="Množstvo"
-                type="number"
-                value={newItem.quantity}
-                onChange={(e) => setNewItem({ ...newItem, quantity: e.target.value })}
-                className="w-24"
-              />
-              <Input
-                placeholder="Jednotka"
-                value={newItem.unit}
-                onChange={(e) => setNewItem({ ...newItem, unit: e.target.value })}
-                className="w-24"
-              />
-              <Button onClick={addItem}>
-                <Plus className="w-4 h-4" />
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        <>
+          <Card>
+            <CardHeader>
+              <CardTitle>Pridať položku</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Názov položky"
+                  value={newItem.name}
+                  onChange={(e) => setNewItem({ ...newItem, name: e.target.value })}
+                  onKeyPress={(e) => e.key === "Enter" && addItem()}
+                  className="flex-1"
+                />
+                <Input
+                  placeholder="Množstvo (napr. 2ks, 200g, 20dag, alebo len 2)"
+                  value={newItem.quantity}
+                  onChange={(e) => setNewItem({ ...newItem, quantity: e.target.value })}
+                  onKeyPress={(e) => e.key === "Enter" && addItem()}
+                  className="w-64"
+                />
+                <Button onClick={addItem}>
+                  <Plus className="w-4 h-4" />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+          {items.length > 0 && (
+            <Card>
+              <CardContent className="p-4">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                  <Input
+                    placeholder="Hľadať položky..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </>
       )}
 
       {!isAuthenticated ? (
@@ -507,31 +665,64 @@ const ShoppingList = () => {
             <p className="text-muted-foreground">Váš nákupný zoznam je prázdny</p>
           </CardContent>
         </Card>
+      ) : filteredItems.length === 0 ? (
+        <Card className="text-center py-12">
+          <CardContent>
+            <p className="text-muted-foreground">Nenašli sa žiadne položky zodpovedajúce vyhľadávaniu</p>
+          </CardContent>
+        </Card>
       ) : (
         <div className="space-y-2">
-          {items.map((item) => (
-            <Card key={item.id}>
+          {filteredItems.map((item) => (
+            <Card 
+              key={item.id}
+              className={`transition-all duration-300 ease-in-out ${
+                selectionMode && selectedItems.has(item.id) 
+                  ? "border-primary bg-primary/5" 
+                  : item.is_checked && !selectionMode
+                  ? "opacity-75"
+                  : ""
+              }`}
+            >
               <CardContent className="flex items-center gap-4 p-4">
-                <Checkbox
-                  checked={item.is_checked}
-                  onCheckedChange={(checked) => toggleItem(item.id, !!checked)}
-                />
-                <div className={`flex-1 ${item.is_checked ? "line-through text-muted-foreground" : ""}`}>
-                  <span className="font-medium">{item.item_name}</span>
+                {selectionMode ? (
+                  <Checkbox
+                    checked={selectedItems.has(item.id)}
+                    onCheckedChange={() => toggleSelection(item.id)}
+                  />
+                ) : (
+                  <Checkbox
+                    checked={item.is_checked}
+                    onCheckedChange={(checked) => toggleItem(item.id, !!checked)}
+                  />
+                )}
+                <div 
+                  className={`flex-1 transition-all duration-300 ease-in-out ${
+                    item.is_checked && !selectionMode 
+                      ? "line-through text-muted-foreground opacity-60" 
+                      : "opacity-100"
+                  }`}
+                >
+                  <span className="font-medium transition-all duration-300">{item.item_name}</span>
                   {(item.quantity || item.unit) && (
-                    <span className="text-muted-foreground ml-2">
-                      {item.quantity && item.quantity !== 1 && `${item.quantity} `}
-                      {item.unit}
+                    <span className="text-muted-foreground ml-2 transition-all duration-300">
+                      {item.unit 
+                        ? `(${item.unit})` 
+                        : item.quantity 
+                        ? `(${item.quantity})` 
+                        : ""}
                     </span>
                   )}
                 </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => deleteItem(item.id)}
-                >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
+                {!selectionMode && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => deleteItem(item.id)}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                )}
               </CardContent>
             </Card>
           ))}
