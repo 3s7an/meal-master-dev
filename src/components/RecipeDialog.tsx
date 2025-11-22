@@ -384,26 +384,6 @@ const RecipeDialog = ({ open, onOpenChange, recipe, onSuccess }: RecipeDialogPro
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-2">
-            <Label htmlFor="name">Názov receptu *</Label>
-            <Input
-              id="name"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              required
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="description">Popis</Label>
-            <Textarea
-              id="description"
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              rows={2}
-            />
-          </div>
-
-          <div className="space-y-2">
             <Label htmlFor="image">Fotka receptu</Label>
             <div className="space-y-3">
               {imagePreview ? (
@@ -462,6 +442,26 @@ const RecipeDialog = ({ open, onOpenChange, recipe, onSuccess }: RecipeDialogPro
             </div>
           </div>
 
+          <div className="space-y-2">
+            <Label htmlFor="name">Názov receptu *</Label>
+            <Input
+              id="name"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              required
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="description">Popis</Label>
+            <Textarea
+              id="description"
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              rows={2}
+            />
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="category">Kategória *</Label>
@@ -502,26 +502,13 @@ const RecipeDialog = ({ open, onOpenChange, recipe, onSuccess }: RecipeDialogPro
               </Button>
             </div>
             {ingredients.map((ingredient, index) => (
-              <div key={index} className="flex flex-col sm:flex-row gap-2">
-                <Input
-                  placeholder="Názov ingrediencie"
-                  value={ingredient.name}
-                  onChange={(e) => updateIngredient(index, "name", e.target.value)}
-                  className="flex-1 min-w-0"
-                />
+              <div key={index} className="space-y-2 border rounded-lg p-3">
                 <div className="flex gap-2">
                   <Input
-                    placeholder="Mn."
-                    type="number"
-                    value={ingredient.quantity || ""}
-                    onChange={(e) => updateIngredient(index, "quantity", parseFloat(e.target.value) || 0)}
-                    className="w-16 sm:w-20"
-                  />
-                  <Input
-                    placeholder="jedn."
-                    value={ingredient.unit}
-                    onChange={(e) => updateIngredient(index, "unit", e.target.value)}
-                    className="w-16 sm:w-20"
+                    placeholder="Názov ingrediencie"
+                    value={ingredient.name}
+                    onChange={(e) => updateIngredient(index, "name", e.target.value)}
+                    className="flex-1 min-w-0"
                   />
                   <Button
                     type="button"
@@ -533,6 +520,21 @@ const RecipeDialog = ({ open, onOpenChange, recipe, onSuccess }: RecipeDialogPro
                   >
                     <Trash2 className="w-4 h-4" />
                   </Button>
+                </div>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Množstvo"
+                    type="number"
+                    value={ingredient.quantity || ""}
+                    onChange={(e) => updateIngredient(index, "quantity", parseFloat(e.target.value) || 0)}
+                    className="flex-1"
+                  />
+                  <Input
+                    placeholder="Jednotka"
+                    value={ingredient.unit}
+                    onChange={(e) => updateIngredient(index, "unit", e.target.value)}
+                    className="flex-1"
+                  />
                 </div>
               </div>
             ))}

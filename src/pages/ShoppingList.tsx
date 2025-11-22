@@ -21,7 +21,7 @@ const ShoppingList = () => {
   const { toast } = useToast();
   const [items, setItems] = useState<ShoppingItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [newItem, setNewItem] = useState({ name: "", quantity: "" });
+  const [newItem, setNewItem] = useState({ name: "" });
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
@@ -75,35 +75,16 @@ const ShoppingList = () => {
   };
 
   const addItem = async () => {
-    if (!newItem.name) return;
+    if (!newItem.name.trim()) return;
 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    // Parsovanie quantity - ak je to len číslo, uložíme ho do quantity, inak celý text do unit
-    let quantityValue: number | null = null;
-    let unitValue: string | null = null;
-
-    if (newItem.quantity.trim()) {
-      const trimmedQuantity = newItem.quantity.trim();
-      // Skúsime parsovať ako číslo
-      const parsedNumber = parseFloat(trimmedQuantity);
-      if (!isNaN(parsedNumber) && trimmedQuantity === parsedNumber.toString()) {
-        // Je to len číslo
-        quantityValue = parsedNumber;
-        unitValue = null;
-      } else {
-        // Je to text (napr. "2ks", "200g", "20dag")
-        quantityValue = null;
-        unitValue = trimmedQuantity;
-      }
-    }
-
     const { error } = await supabase.from("shopping_list").insert({
       user_id: user.id,
-      item_name: newItem.name,
-      quantity: quantityValue,
-      unit: unitValue,
+      item_name: newItem.name.trim(),
+      quantity: null,
+      unit: null,
       is_checked: false,
     });
 
@@ -114,7 +95,7 @@ const ShoppingList = () => {
         variant: "destructive",
       });
     } else {
-      setNewItem({ name: "", quantity: "" });
+      setNewItem({ name: "" });
       fetchItems();
     }
   };
@@ -616,17 +597,10 @@ const ShoppingList = () => {
                   value={newItem.name}
                   onChange={(e) => setNewItem({ ...newItem, name: e.target.value })}
                   onKeyPress={(e) => e.key === "Enter" && addItem()}
-                  className="flex-1"
+                  className="flex-1 min-w-0"
                 />
-                <Input
-                  placeholder="Množstvo (napr. 2ks, 200g, 20dag, alebo len 2)"
-                  value={newItem.quantity}
-                  onChange={(e) => setNewItem({ ...newItem, quantity: e.target.value })}
-                  onKeyPress={(e) => e.key === "Enter" && addItem()}
-                  className="w-64"
-                />
-                <Button onClick={addItem}>
-                  <Plus className="w-4 h-4" />
+                <Button onClick={addItem} size="icon" className="shrink-0">
+                  <Plus className="w-5 h-5" />
                 </Button>
               </div>
             </CardContent>

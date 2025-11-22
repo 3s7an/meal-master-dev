@@ -446,9 +446,9 @@ const Feed = () => {
       )}
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{selectedRecipe?.name}</DialogTitle>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto w-[95vw] md:w-full max-w-[95vw] md:max-w-2xl overflow-x-hidden">
+          <DialogHeader className="w-full max-w-full">
+            <DialogTitle className="break-words">{selectedRecipe?.name}</DialogTitle>
             <DialogDescription>
               <div className="flex items-center gap-2 flex-wrap">
                 {selectedRecipe && (
@@ -474,7 +474,7 @@ const Feed = () => {
           </DialogHeader>
 
           {selectedRecipe && (
-            <div className="space-y-6">
+            <div className="space-y-6 w-full max-w-full overflow-x-hidden">
               {selectedRecipe.image_url && (
                 <div className="relative w-full aspect-video overflow-hidden rounded-lg bg-gradient-to-br from-primary/20 to-secondary/20">
                   <img
@@ -484,16 +484,16 @@ const Feed = () => {
                   />
                 </div>
               )}
-              <div>
+              <div className="w-full max-w-full">
                 <Label>Popis</Label>
-                <p className="text-sm text-muted-foreground mt-1">{selectedRecipe.description}</p>
+                <p className="text-sm text-muted-foreground mt-1 break-words">{selectedRecipe.description}</p>
               </div>
 
-              <div>
+              <div className="w-full max-w-full">
                 <Label>Ingrediencie ({selectedRecipe.ingredients?.length || 0})</Label>
                 <ul className="list-disc list-inside space-y-1 mt-2">
                   {selectedRecipe.ingredients?.map((ing: any, idx: number) => (
-                    <li key={idx} className="text-sm">
+                    <li key={idx} className="text-sm break-words">
                       {ing.name}
                       {ing.quantity && ing.quantity !== 1 ? ` - ${ing.quantity}` : ""}
                       {ing.unit ? ` ${ing.unit}` : ""}
@@ -503,12 +503,12 @@ const Feed = () => {
               </div>
 
               {selectedRecipe.instructions && (
-                <div>
+                <div className="w-full max-w-full">
                   <Label>Postup prípravy</Label>
                   <Textarea
                     value={selectedRecipe.instructions}
                     readOnly
-                    className="mt-2 min-h-[120px]"
+                    className="mt-2 min-h-[120px] w-full max-w-full resize-none"
                   />
                 </div>
               )}
@@ -520,10 +520,10 @@ const Feed = () => {
                 </div>
               )}
 
-              <div className="flex gap-2 pt-4">
+              <div className="flex flex-col sm:flex-row gap-2 pt-4 w-full max-w-full">
                 <Button
                   variant="outline"
-                  className="gap-2"
+                  className="gap-2 w-full sm:w-auto"
                   onClick={(e) => {
                     e.stopPropagation();
                     toggleLike(selectedRecipe.id, e as any);
@@ -536,7 +536,7 @@ const Feed = () => {
                 {selectedRecipe.user_id !== currentUserId && (
                   <Button
                     onClick={() => toggleSaveRecipe(selectedRecipe.id)}
-                    className="gap-2"
+                    className="gap-2 w-full sm:w-auto"
                     variant={selectedRecipe.is_saved ? "destructive" : "default"}
                   >
                     {selectedRecipe.is_saved ? (
@@ -544,7 +544,12 @@ const Feed = () => {
                     ) : (
                       <Plus className="w-4 h-4" />
                     )}
-                    {selectedRecipe.is_saved ? "Odobrať z mojich receptov" : "Pridať do mojich receptov"}
+                    <span className="hidden sm:inline">
+                      {selectedRecipe.is_saved ? "Odobrať z mojich receptov" : "Pridať do mojich receptov"}
+                    </span>
+                    <span className="sm:hidden">
+                      {selectedRecipe.is_saved ? "Odobrať" : "Pridať"}
+                    </span>
                   </Button>
                 )}
               </div>
