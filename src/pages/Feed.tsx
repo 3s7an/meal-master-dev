@@ -429,13 +429,16 @@ const Feed = () => {
           {filteredRecipes.map((recipe) => (
             <Card
               key={recipe.id}
-              className="overflow-hidden hover:shadow-xl transition-all duration-300 cursor-pointer flex flex-col group border shadow-md hover:-translate-y-1"
+              className="overflow-hidden hover:shadow-2xl transition-all duration-300 cursor-pointer flex flex-col group border-0 shadow-lg hover:-translate-y-1 bg-gradient-to-br from-background/80 via-primary/5 to-background/60 backdrop-blur-sm"
               onClick={() => handleRecipeClick(recipe)}
             >
               {/* Content Section */}
-              <div className="flex flex-col p-5 gap-4 bg-card">
+              <div className="flex flex-col p-5 gap-4 bg-transparent relative">
+                {/* Subtle gradient overlay */}
+                <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5 rounded-lg opacity-50" />
+                <div className="relative z-10">
                 {/* Title at the top */}
-                <CardTitle className="font-bold text-xl leading-tight break-words line-clamp-2 group-hover:text-primary transition-colors">
+                <CardTitle className="font-bold text-xl leading-tight break-words line-clamp-2 group-hover:text-primary transition-colors mb-6">
                   {recipe.name}
                 </CardTitle>
 
@@ -514,6 +517,7 @@ const Feed = () => {
                       </span>
                     </div>
                   )}
+                </div>
                 </div>
               </div>
             </Card>
