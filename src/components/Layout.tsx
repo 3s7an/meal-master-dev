@@ -89,10 +89,14 @@ const Layout = ({ children }: LayoutProps) => {
   ];
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-gradient-to-br from-background via-primary/5 to-background relative">
+      {/* Gradient overlay decoration */}
+      <div className="fixed inset-0 bg-gradient-to-br from-primary/8 via-transparent to-accent/8 pointer-events-none -z-10" />
+      <div className="fixed inset-0 bg-[radial-gradient(circle_at_30%_20%,hsl(var(--primary))/10%,transparent_50%)] pointer-events-none -z-10" />
+      
       {/* Top Navbar - kompaktný na mobile, auto-hide pri scrollovaní */}
       <header 
-        className={`border-b bg-card sticky z-50 shadow-sm transition-transform duration-300 ${
+        className={`border-b bg-gradient-to-r from-card via-card/95 to-primary/5 backdrop-blur-sm sticky z-50 shadow-sm transition-transform duration-300 ${
           isScrolled ? "-translate-y-full" : "translate-y-0"
         }`}
       >
@@ -114,10 +118,10 @@ const Layout = ({ children }: LayoutProps) => {
                   <Link
                     key={item.to}
                     to={item.to}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+                    className={`flex items-center gap-2 px-4 py-2 transition-colors ${
                       isActive
-                        ? "bg-primary text-primary-foreground"
-                        : "hover:bg-muted"
+                        ? "text-foreground border-b-2 border-primary"
+                        : "text-muted-foreground hover:text-foreground"
                     }`}
                   >
                     <Icon className="w-5 h-5" />
@@ -153,8 +157,8 @@ const Layout = ({ children }: LayoutProps) => {
                           onClick={() => setMobileMenuOpen(false)}
                           className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
                             isActive
-                              ? "bg-primary text-primary-foreground"
-                              : "hover:bg-muted"
+                              ? "text-foreground border-l-4 border-primary"
+                              : "text-muted-foreground hover:text-foreground"
                           }`}
                         >
                           <Icon className="w-5 h-5" />
@@ -199,12 +203,12 @@ const Layout = ({ children }: LayoutProps) => {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-4 md:py-8 pb-20 md:pb-8">
+      <main className="container mx-auto px-4 py-4 md:py-8 pb-20 md:pb-8 relative z-10">
         {children}
       </main>
 
       {/* Bottom Navigation Bar - len na mobile */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-card border-t md:hidden z-40 shadow-lg">
+      <nav className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-card via-card/95 to-primary/5 backdrop-blur-sm border-t md:hidden z-40 shadow-lg">
         <div className="flex items-center justify-around py-2">
           {navItems.map((item) => {
             const Icon = item.icon;
@@ -215,7 +219,7 @@ const Layout = ({ children }: LayoutProps) => {
                 to={item.to}
                 className={`flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-lg transition-colors min-w-[60px] ${
                   isActive
-                    ? "text-primary"
+                    ? "text-primary border-t-2 border-primary"
                     : "text-muted-foreground"
                 }`}
               >

@@ -48,3 +48,7 @@ export const getCategoryOption = (value?: string | null): CategoryOption => {
   return CATEGORY_OPTIONS.find((option) => option.value === normalized) ?? CATEGORY_OPTIONS[0];
 };
 
+export const getCategoryImagePath = (categoryValue: string): string => {
+  return `/images/category_mini/${categoryValue}.png`;
+};
+
