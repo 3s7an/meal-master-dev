@@ -10,6 +10,7 @@ import { Plus, Trash2, ShoppingCart, Globe, Lock, X, Image as ImageIcon } from "
 import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
 import { CATEGORY_OPTIONS, DEFAULT_CATEGORY, normalizeCategory } from "@/constants/categories";
+import { recipeSchema } from "@/lib/validations";
 
 interface Ingredient {
   name: string;
@@ -188,10 +189,9 @@ const RecipeDialog = ({ open, onOpenChange, recipe, onSuccess }: RecipeDialogPro
         });
 
       if (uploadError) {
-        console.error('Upload error:', uploadError);
+      console.error('Upload error:', uploadError);
         console.error('Error details:', {
           message: uploadError.message,
-          statusCode: uploadError.statusCode,
           error: uploadError
         });
         
@@ -232,6 +232,17 @@ const RecipeDialog = ({ open, onOpenChange, recipe, onSuccess }: RecipeDialogPro
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    const validation = recipeSchema.safeParse(formData);
+    if (!validation.success) {
+      toast({
+        title: "Chyba",
+        description: validation.error.errors[0].message,
+        variant: "destructive",
+      });
+      return;
+    }
+
     setLoading(true);
 
     const { data: { user } } = await supabase.auth.getUser();

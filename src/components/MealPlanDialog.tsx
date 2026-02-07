@@ -10,6 +10,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Card, CardContent } from "@/components/ui/card";
 import { Trash2, Plus, Download, Check, ChevronsUpDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { mealPlanSchema } from "@/lib/validations";
 import { addDays, format } from "date-fns";
 import { sk } from "date-fns/locale";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -178,6 +179,16 @@ const MealPlanDialog = ({ open, onOpenChange, plan, onSuccess }: MealPlanDialogP
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    const validation = mealPlanSchema.safeParse(formData);
+    if (!validation.success) {
+      toast({
+        title: "Chyba",
+        description: validation.error.errors[0].message,
+        variant: "destructive",
+      });
+      return;
+    }
     
     if (selectedMealTypes.length === 0) {
       toast({

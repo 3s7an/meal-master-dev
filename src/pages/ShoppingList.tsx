@@ -7,6 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, Trash2, Download, CheckSquare, Square, X, Search } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
+import { shoppingItemSchema } from "@/lib/validations";
 
 interface ShoppingItem {
   id: string;
@@ -75,7 +76,15 @@ const ShoppingList = () => {
   };
 
   const addItem = async () => {
-    if (!newItem.name.trim()) return;
+    const validation = shoppingItemSchema.safeParse({ item_name: newItem.name });
+    if (!validation.success) {
+      toast({
+        title: "Chyba",
+        description: validation.error.errors[0].message,
+        variant: "destructive",
+      });
+      return;
+    }
 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
