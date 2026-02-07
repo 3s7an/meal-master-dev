@@ -16,6 +16,9 @@ dist-ssr
 .env.local
 .env*.local
 
+# Vygenerovaný seed (voliteľné)
+scripts/seed-recipes.sql
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
