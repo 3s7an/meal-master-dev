@@ -14,9 +14,11 @@ Simply visit the [Lovable Project](https://lovable.dev/projects/d389b289-3854-45
 
 Changes made via Lovable will be committed automatically to this repo.
 
-**Use your preferred IDE**
+**Use your preferred IDE (odporúčané pre zachovanie Supabase dát)**
 
 If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+
+**Dôležité:** Ak používaš vlastný Supabase (recepty, dáta), upravuj kód lokálne a pushuj odtiaľ na Git. Úpravy v Lovable + push odtiaľ môžu prepnúť backend na Lovable Cloud a „stratiš“ dáta. Detaily: [LOVABLE_GIT_WORKFLOW.md](./LOVABLE_GIT_WORKFLOW.md).
 
 The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
 
