@@ -1,75 +1,35 @@
-# Welcome to your Lovable project
+# MealMaster
 
-## Project info
+Správca receptov, nákupných zoznamov a jedálničkov. Frontend (Vite + React) s backendom na Supabase.
 
-**URL**: https://lovable.dev/projects/d389b289-3854-45fd-8f3b-446e79dd1fb9
+## Lokálny vývoj
 
-## How can I edit this code?
-
-There are several ways of editing your application.
-
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/d389b289-3854-45fd-8f3b-446e79dd1fb9) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE (odporúčané pre zachovanie Supabase dát)**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-**Dôležité:** Ak používaš vlastný Supabase (recepty, dáta), upravuj kód lokálne a pushuj odtiaľ na Git. Úpravy v Lovable + push odtiaľ môžu prepnúť backend na Lovable Cloud a „stratiš“ dáta. Detaily: [LOVABLE_GIT_WORKFLOW.md](./LOVABLE_GIT_WORKFLOW.md).
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
+Potrebuješ Node.js a npm ([nvm](https://github.com/nvm-sh/nvm#installing-and-updating)).
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
+git clone <URL_REPO>
+cd meal-master-dev
+cp .env.example .env
+# Vyplň .env – hodnoty z Supabase Dashboard → Project Settings → API
 npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+## Technológie
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+- Vite, TypeScript, React
+- shadcn/ui, Tailwind CSS
+- Supabase (auth, databáza, storage)
 
-**Use GitHub Codespaces**
+## Nasadenie (Vercel)
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+1. Import repozitára vo Vercel, preset **Vite**.
+2. V **Settings → Environment Variables** nastav:
+   - `VITE_SUPABASE_URL`
+   - `VITE_SUPABASE_PUBLISHABLE_KEY`
+   - (voliteľne) `VITE_SUPABASE_PROJECT_ID`
+3. Deploy.
 
-## What technologies are used for this project?
+## Náhľad odkazu (og:image)
 
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/d389b289-3854-45fd-8f3b-446e79dd1fb9) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+Pre vlastný obrázok pri zdieľaní linku pridaj súbor `public/og-image.png` (odporúčaná šírka cca 1200px). V `index.html` sú meta tagy nastavené na `/og-image.png`.

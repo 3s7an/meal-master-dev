@@ -8,7 +8,7 @@ const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
 if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
   throw new Error(
-    "Chýbajú Supabase premenné. Nastav VITE_SUPABASE_URL a VITE_SUPABASE_PUBLISHABLE_KEY v .env (lokálne) alebo v nastaveniach deployu (Lovable)."
+    "Chýbajú Supabase premenné. Nastav VITE_SUPABASE_URL a VITE_SUPABASE_PUBLISHABLE_KEY v .env (lokálne) alebo v nastaveniach deployu (Vercel)."
   );
 }
 
