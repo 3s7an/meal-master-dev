@@ -1,57 +1,31 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import type { MouseEvent } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { normalizeCategory } from "@/constants/categories";
+import { useAuth } from "@/contexts/AuthContext";
+import type { FeedRecipe } from "@/types/recipe";
 
-export interface Recipe {
-  id: string;
-  name: string;
-  description: string;
-  category: string;
-  ingredients: any;
-  instructions: string;
-  image_url?: string;
-  calories?: number;
-  user_id: string;
-  created_at: string;
-  likes_count?: number;
-  is_liked?: boolean;
-  is_saved?: boolean;
-  author_name?: string | null;
-}
+export type { FeedRecipe as Recipe };
 
 export function useFeedRecipes() {
   const { toast } = useToast();
-  const [recipes, setRecipes] = useState<Recipe[]>([]);
-  const [filteredRecipes, setFilteredRecipes] = useState<Recipe[]>([]);
+  const { user } = useAuth();
+  const [recipes, setRecipes] = useState<FeedRecipe[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<"recent" | "popular">("recent");
-  const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
+  const [selectedRecipe, setSelectedRecipe] = useState<FeedRecipe | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchRecipes();
-  }, [sortBy]);
-
-  useEffect(() => {
-    filterRecipes();
-  }, [recipes, searchTerm, selectedCategory]);
-
-  const fetchRecipes = async () => {
-    setLoading(true);
-    const { data: { user } } = await supabase.auth.getUser();
-
+  const fetchRecipes = useCallback(async () => {
     if (!user) {
       setLoading(false);
-      setCurrentUserId(null);
       return;
     }
 
-    setCurrentUserId(user.id);
+    setLoading(true);
 
     const { data: recipesData, error: recipesError } = await supabase
       .from("recipes")
@@ -86,10 +60,9 @@ export function useFeedRecipes() {
     const recipesWithStats = recipesData?.map((recipe: any) => {
       const recipeLikes = likesData?.filter(like => like.recipe_id === recipe.id) || [];
       const authorName = recipe.profiles?.full_name || null;
-      const normalizedCategory = normalizeCategory(recipe.category);
       return {
         ...recipe,
-        category: normalizedCategory,
+        category: normalizeCategory(recipe.category),
         author_name: authorName,
         likes_count: recipeLikes.length,
         is_liked: recipeLikes.some(like => like.user_id === user.id),
@@ -103,14 +76,19 @@ export function useFeedRecipes() {
 
     setRecipes(recipesWithStats);
     setLoading(false);
-  };
+  }, [user, sortBy, toast]);
 
-  const filterRecipes = () => {
-    let filtered = [...recipes];
+  useEffect(() => {
+    fetchRecipes();
+  }, [fetchRecipes]);
+
+  const filteredRecipes = useMemo(() => {
+    let filtered = recipes;
 
     if (searchTerm) {
+      const term = searchTerm.toLowerCase();
       filtered = filtered.filter((recipe) =>
-        recipe.name.toLowerCase().includes(searchTerm.toLowerCase())
+        recipe.name.toLowerCase().includes(term)
       );
     }
 
@@ -118,12 +96,11 @@ export function useFeedRecipes() {
       filtered = filtered.filter((recipe) => recipe.category === selectedCategory);
     }
 
-    setFilteredRecipes(filtered);
-  };
+    return filtered;
+  }, [recipes, searchTerm, selectedCategory]);
 
   const toggleLike = async (recipeId: string, e: MouseEvent) => {
     e.stopPropagation();
-    const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
     const recipe = recipes.find(r => r.id === recipeId);
@@ -134,16 +111,14 @@ export function useFeedRecipes() {
       ? (recipe.likes_count || 0) - 1
       : (recipe.likes_count || 0) + 1;
 
-    setRecipes(prev => prev.map(r =>
-      r.id === recipeId
-        ? { ...r, is_liked: !wasLiked, likes_count: newLikesCount }
-        : r
-    ));
-    setFilteredRecipes(prev => prev.map(r =>
-      r.id === recipeId
-        ? { ...r, is_liked: !wasLiked, likes_count: newLikesCount }
-        : r
-    ));
+    const optimisticUpdate = (list: FeedRecipe[]) =>
+      list.map(r =>
+        r.id === recipeId
+          ? { ...r, is_liked: !wasLiked, likes_count: newLikesCount }
+          : r
+      );
+
+    setRecipes(optimisticUpdate);
 
     if (selectedRecipe?.id === recipeId) {
       setSelectedRecipe(prev => prev ? {
@@ -153,6 +128,21 @@ export function useFeedRecipes() {
       } : null);
     }
 
+    const rollback = () => {
+      setRecipes(prev => prev.map(r =>
+        r.id === recipeId
+          ? { ...r, is_liked: wasLiked, likes_count: recipe.likes_count || 0 }
+          : r
+      ));
+      if (selectedRecipe?.id === recipeId) {
+        setSelectedRecipe(prev => prev ? {
+          ...prev,
+          is_liked: wasLiked,
+          likes_count: recipe.likes_count || 0
+        } : null);
+      }
+    };
+
     if (wasLiked) {
       const { error } = await supabase
         .from("recipe_likes")
@@ -160,54 +150,17 @@ export function useFeedRecipes() {
         .eq("recipe_id", recipeId)
         .eq("user_id", user.id);
 
-      if (error) {
-        setRecipes(prev => prev.map(r =>
-          r.id === recipeId
-            ? { ...r, is_liked: wasLiked, likes_count: recipe.likes_count || 0 }
-            : r
-        ));
-        setFilteredRecipes(prev => prev.map(r =>
-          r.id === recipeId
-            ? { ...r, is_liked: wasLiked, likes_count: recipe.likes_count || 0 }
-            : r
-        ));
-        if (selectedRecipe?.id === recipeId) {
-          setSelectedRecipe(prev => prev ? {
-            ...prev,
-            is_liked: wasLiked,
-            likes_count: recipe.likes_count || 0
-          } : null);
-        }
-      }
+      if (error) rollback();
     } else {
       const { error } = await supabase
         .from("recipe_likes")
         .insert({ recipe_id: recipeId, user_id: user.id });
 
-      if (error) {
-        setRecipes(prev => prev.map(r =>
-          r.id === recipeId
-            ? { ...r, is_liked: wasLiked, likes_count: recipe.likes_count || 0 }
-            : r
-        ));
-        setFilteredRecipes(prev => prev.map(r =>
-          r.id === recipeId
-            ? { ...r, is_liked: wasLiked, likes_count: recipe.likes_count || 0 }
-            : r
-        ));
-        if (selectedRecipe?.id === recipeId) {
-          setSelectedRecipe(prev => prev ? {
-            ...prev,
-            is_liked: wasLiked,
-            likes_count: recipe.likes_count || 0
-          } : null);
-        }
-      }
+      if (error) rollback();
     }
   };
 
   const toggleSaveRecipe = async (recipeId: string) => {
-    const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
     const recipe = recipes.find(r => r.id === recipeId);
@@ -273,7 +226,7 @@ export function useFeedRecipes() {
     }
   };
 
-  const handleRecipeClick = (recipe: Recipe) => {
+  const handleRecipeClick = (recipe: FeedRecipe) => {
     setSelectedRecipe(recipe);
     setIsDialogOpen(true);
   };
@@ -293,6 +246,6 @@ export function useFeedRecipes() {
     toggleLike,
     toggleSaveRecipe,
     handleRecipeClick,
-    currentUserId,
+    currentUserId: user?.id ?? null,
   };
 }

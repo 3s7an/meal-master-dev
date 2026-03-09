@@ -1,11 +1,10 @@
 import { ReactNode, useEffect, useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { UtensilsCrossed, ShoppingCart, Calendar, LogOut, User, Rss, Menu, X } from "lucide-react";
+import { UtensilsCrossed, ShoppingCart, Calendar, LogOut, User, Rss, Menu } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { Session } from "@supabase/supabase-js";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface LayoutProps {
   children: ReactNode;
@@ -15,27 +14,15 @@ const Layout = ({ children }: LayoutProps) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
-  const [session, setSession] = useState<Session | null>(null);
+  const { session, isLoading, signOut } = useAuth();
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setSession(session);
-      if (!session && location.pathname !== "/auth") {
-        navigate("/auth");
-      }
-    });
-
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      if (!session && location.pathname !== "/auth") {
-        navigate("/auth");
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, [navigate, location]);
+    if (!isLoading && !session && location.pathname !== "/auth") {
+      navigate("/auth");
+    }
+  }, [session, isLoading, navigate, location.pathname]);
 
   useEffect(() => {
     let lastScrollY = window.scrollY;
@@ -69,7 +56,7 @@ const Layout = ({ children }: LayoutProps) => {
   }, []);
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
+    await signOut();
     toast({
       title: "Odhlásený",
       description: "Boli ste úspešne odhlásený.",
@@ -77,7 +64,7 @@ const Layout = ({ children }: LayoutProps) => {
     navigate("/auth");
   };
 
-  if (!session) {
+  if (isLoading || !session) {
     return null;
   }
 
@@ -90,11 +77,9 @@ const Layout = ({ children }: LayoutProps) => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-primary/5 to-background relative">
-      {/* Gradient overlay decoration */}
       <div className="fixed inset-0 bg-gradient-to-br from-primary/8 via-transparent to-accent/8 pointer-events-none -z-10" />
       <div className="fixed inset-0 bg-[radial-gradient(circle_at_30%_20%,hsl(var(--primary))/10%,transparent_50%)] pointer-events-none -z-10" />
       
-      {/* Top Navbar - kompaktný na mobile, auto-hide pri scrollovaní */}
       <header 
         className={`border-b bg-gradient-to-r from-card via-card/95 to-primary/5 backdrop-blur-sm sticky z-50 shadow-sm transition-transform duration-300 ${
           isScrolled ? "-translate-y-full" : "translate-y-0"
@@ -109,7 +94,6 @@ const Layout = ({ children }: LayoutProps) => {
               <span className="text-lg md:text-2xl font-bold">MealMaster</span>
             </Link>
 
-            {/* Desktop Navigation */}
             <nav className="hidden md:flex items-center gap-6">
               {navItems.map((item) => {
                 const Icon = item.icon;
@@ -132,7 +116,6 @@ const Layout = ({ children }: LayoutProps) => {
             </nav>
 
             <div className="flex items-center gap-2">
-              {/* Mobile Menu Button */}
               <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
                 <SheetTrigger asChild className="md:hidden">
                   <Button variant="ghost" size="icon">
@@ -187,7 +170,6 @@ const Layout = ({ children }: LayoutProps) => {
                 </SheetContent>
               </Sheet>
 
-              {/* Desktop User Actions */}
               <div className="hidden md:flex items-center gap-2">
                 <Button variant="ghost" size="icon" asChild>
                   <Link to="/profile">
@@ -207,7 +189,6 @@ const Layout = ({ children }: LayoutProps) => {
         {children}
       </main>
 
-      {/* Bottom Navigation Bar - len na mobile */}
       <nav className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-card via-card/95 to-primary/5 backdrop-blur-sm border-t md:hidden z-40 shadow-lg">
         <div className="flex items-center justify-around py-2">
           {navItems.map((item) => {

@@ -1,35 +1,16 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { normalizeCategory } from "@/constants/categories";
+import { useAuth } from "@/contexts/AuthContext";
+import type { Recipe, UserRecipe, RecipeSource } from "@/types/recipe";
 
-export interface Recipe {
-  id: string;
-  name: string;
-  description: string;
-  category: string;
-  ingredients: any;
-  instructions: string;
-  image_url?: string;
-  calories?: number;
-  notes?: string;
-  user_id?: string;
-  is_public?: boolean;
-  created_at?: string;
-}
-
-export type RecipeSource = "own" | "saved";
-
-export interface UserRecipe extends Recipe {
-  source: RecipeSource;
-  saved_at?: string;
-  author_name?: string | null;
-}
+export type { Recipe, UserRecipe, RecipeSource };
 
 export function useRecipes() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [recipes, setRecipes] = useState<UserRecipe[]>([]);
-  const [filteredRecipes, setFilteredRecipes] = useState<UserRecipe[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -37,27 +18,14 @@ export function useRecipes() {
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
   const [isSavedDialogOpen, setIsSavedDialogOpen] = useState(false);
   const [selectedSavedRecipe, setSelectedSavedRecipe] = useState<UserRecipe | null>(null);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchRecipes();
-  }, []);
-
-  useEffect(() => {
-    filterRecipes();
-  }, [recipes, searchTerm, selectedCategory]);
-
-  const fetchRecipes = async () => {
-    setLoading(true);
-    const { data: { user } } = await supabase.auth.getUser();
-
+  const fetchRecipes = useCallback(async () => {
     if (!user) {
       setLoading(false);
-      setCurrentUserId(null);
       return;
     }
 
-    setCurrentUserId(user.id);
+    setLoading(true);
 
     const [
       { data: ownData, error: ownError },
@@ -105,10 +73,9 @@ export function useRecipes() {
             if (!entry.recipes) return null;
             const recipe = entry.recipes;
             const authorName = recipe.profiles?.full_name || null;
-            const normalizedCategory = normalizeCategory(recipe.category);
             return {
               ...recipe,
-              category: normalizedCategory,
+              category: normalizeCategory(recipe.category),
               source: "saved" as RecipeSource,
               saved_at: entry.created_at as string | undefined,
               author_name: authorName,
@@ -151,14 +118,19 @@ export function useRecipes() {
       setRecipes(combined);
     }
     setLoading(false);
-  };
+  }, [user, toast]);
 
-  const filterRecipes = () => {
-    let filtered = [...recipes];
+  useEffect(() => {
+    fetchRecipes();
+  }, [fetchRecipes]);
+
+  const filteredRecipes = useMemo(() => {
+    let filtered = recipes;
 
     if (searchTerm) {
+      const term = searchTerm.toLowerCase();
       filtered = filtered.filter((recipe) =>
-        recipe.name.toLowerCase().includes(searchTerm.toLowerCase())
+        recipe.name.toLowerCase().includes(term)
       );
     }
 
@@ -166,11 +138,10 @@ export function useRecipes() {
       filtered = filtered.filter((recipe) => recipe.category === selectedCategory);
     }
 
-    setFilteredRecipes(filtered);
-  };
+    return filtered;
+  }, [recipes, searchTerm, selectedCategory]);
 
   const handleToggleSave = async (recipeId: string) => {
-    const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
     const recipe = recipes.find((r) => r.id === recipeId);
@@ -198,9 +169,6 @@ export function useRecipes() {
       });
 
       setRecipes((prev) =>
-        prev.filter((item) => !(item.id === recipeId && item.source === "saved"))
-      );
-      setFilteredRecipes((prev) =>
         prev.filter((item) => !(item.id === recipeId && item.source === "saved"))
       );
       if (selectedSavedRecipe?.id === recipeId) {
@@ -265,7 +233,7 @@ export function useRecipes() {
     selectedRecipe,
     isSavedDialogOpen,
     selectedSavedRecipe,
-    currentUserId,
+    currentUserId: user?.id ?? null,
     fetchRecipes,
     handleToggleSave,
     handleRecipeClick,

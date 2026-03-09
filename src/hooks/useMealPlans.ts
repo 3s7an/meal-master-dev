@@ -1,9 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import { addDays, format } from "date-fns";
 import { sk } from "date-fns/locale";
+import { useAuth } from "@/contexts/AuthContext";
 
 export interface MealPlan {
   id: string;
@@ -55,39 +56,22 @@ const migratePlanDataKeys = (data: any = {}) => {
 
 export function useMealPlans() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [plans, setPlans] = useState<MealPlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<MealPlan | null>(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  useEffect(() => {
-    checkAuth();
-  }, []);
+  const isAuthenticated = !!user;
 
-  useEffect(() => {
-    if (isAuthenticated) {
-      fetchPlans();
-    }
-  }, [isAuthenticated]);
-
-  const checkAuth = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    setIsAuthenticated(!!user);
-    if (!user) {
-      setLoading(false);
-    }
-  };
-
-  const fetchPlans = async () => {
-    setLoading(true);
-    const { data: { user } } = await supabase.auth.getUser();
-
+  const fetchPlans = useCallback(async () => {
     if (!user) {
       setLoading(false);
       setPlans([]);
       return;
     }
+
+    setLoading(true);
 
     const { data, error } = await supabase
       .from("meal_plans")
@@ -105,7 +89,11 @@ export function useMealPlans() {
       setPlans(data || []);
     }
     setLoading(false);
-  };
+  }, [user, toast]);
+
+  useEffect(() => {
+    fetchPlans();
+  }, [fetchPlans]);
 
   const handleCreatePlan = () => {
     setSelectedPlan(null);
@@ -118,7 +106,6 @@ export function useMealPlans() {
   };
 
   const deletePlan = async (id: string) => {
-    const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
     const { error } = await supabase
@@ -400,7 +387,6 @@ export function useMealPlans() {
 
   const generateShoppingList = async (plan: MealPlan) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         toast({
           title: "Chyba",

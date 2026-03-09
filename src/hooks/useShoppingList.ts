@@ -1,8 +1,9 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import { shoppingItemSchema } from "@/lib/validations";
+import { useAuth } from "@/contexts/AuthContext";
 
 export interface ShoppingItem {
   id: string;
@@ -15,41 +16,24 @@ export interface ShoppingItem {
 
 export function useShoppingList() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [items, setItems] = useState<ShoppingItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [newItem, setNewItem] = useState({ name: "" });
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [searchTerm, setSearchTerm] = useState("");
 
-  useEffect(() => {
-    checkAuth();
-  }, []);
+  const isAuthenticated = !!user;
 
-  useEffect(() => {
-    if (isAuthenticated) {
-      fetchItems();
-    }
-  }, [isAuthenticated]);
-
-  const checkAuth = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    setIsAuthenticated(!!user);
-    if (!user) {
-      setLoading(false);
-    }
-  };
-
-  const fetchItems = async () => {
-    setLoading(true);
-    const { data: { user } } = await supabase.auth.getUser();
-
+  const fetchItems = useCallback(async () => {
     if (!user) {
       setLoading(false);
       setItems([]);
       return;
     }
+
+    setLoading(true);
 
     const { data, error } = await supabase
       .from("shopping_list")
@@ -68,7 +52,11 @@ export function useShoppingList() {
       setItems(data || []);
     }
     setLoading(false);
-  };
+  }, [user, toast]);
+
+  useEffect(() => {
+    fetchItems();
+  }, [fetchItems]);
 
   const addItem = async () => {
     const validation = shoppingItemSchema.safeParse({ item_name: newItem.name });
@@ -81,7 +69,6 @@ export function useShoppingList() {
       return;
     }
 
-    const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
     const { error } = await supabase.from("shopping_list").insert({
@@ -105,7 +92,6 @@ export function useShoppingList() {
   };
 
   const toggleItem = async (id: string, is_checked: boolean) => {
-    const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
     const { error } = await supabase
@@ -126,7 +112,6 @@ export function useShoppingList() {
   };
 
   const deleteItem = async (id: string) => {
-    const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
     const { error } = await supabase
@@ -147,7 +132,6 @@ export function useShoppingList() {
   };
 
   const clearChecked = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
     const checkedIds = items.filter(i => i.is_checked).map(i => i.id);
@@ -209,8 +193,6 @@ export function useShoppingList() {
 
   const deleteSelected = async () => {
     if (selectedItems.size === 0) return;
-
-    const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
     const { error } = await supabase
@@ -242,7 +224,6 @@ export function useShoppingList() {
   };
 
   const exportList = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
     const uncheckedItems = items.filter(i => !i.is_checked);
