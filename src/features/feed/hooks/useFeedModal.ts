@@ -1,20 +1,20 @@
 import { useState } from "react";
 import type { FeedRecipe } from "@/types/recipe";
 
-export function useFeedDetailDialog() {
+export function useFeedModal() {
   const [selectedRecipe, setSelectedRecipe] = useState<FeedRecipe | null>(null);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const openRecipe = (recipe: FeedRecipe) => {
     setSelectedRecipe(recipe);
-    setIsDialogOpen(true);
+    setIsModalOpen(true);
   };
 
   return {
     selectedRecipe,
     setSelectedRecipe,
-    isDialogOpen,
-    setIsDialogOpen,
+    isModalOpen,
+    setIsModalOpen,
     openRecipe,
   };
 }

@@ -1,6 +1,6 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { useFeedData } from "./useFeedData";
-import { useFeedDetailDialog } from "./useFeedModal";
+import { useFeedModal } from "./useFeedModal";
 import { useFeedFilters } from "./useFeedFilters";
 import { useFeedMutations } from "./useFeedMutations";
 
@@ -10,15 +10,15 @@ export function useFeedPage() {
 
   const { recipes, setRecipes, loading } = useFeedData(userId);
   const filters = useFeedFilters(recipes);
-  const dialog = useFeedDetailDialog();
+  const modal = useFeedModal();
 
   const { toggleLike, toggleSaveRecipe } = useFeedMutations({
     userId,
     recipes,
     setRecipes,
-    selectedRecipe: dialog.selectedRecipe,
-    setSelectedRecipe: dialog.setSelectedRecipe,
-    onSaveSuccess: () => dialog.setIsDialogOpen(false),
+    selectedRecipe: modal.selectedRecipe,
+    setSelectedRecipe: modal.setSelectedRecipe,
+    onSaveSuccess: () => modal.setIsModalOpen(false),
   });
 
   return {
@@ -28,12 +28,12 @@ export function useFeedPage() {
     setSearchTerm: filters.setSearchTerm,
     selectedCategory: filters.selectedCategory,
     setSelectedCategory: filters.setSelectedCategory,
-    selectedRecipe: dialog.selectedRecipe,
-    isDialogOpen: dialog.isDialogOpen,
-    setIsDialogOpen: dialog.setIsDialogOpen,
+    selectedRecipe: modal.selectedRecipe,
+    isModalOpen: modal.isModalOpen,
+    setIsModalOpen: modal.setIsModalOpen,
     toggleLike,
     toggleSaveRecipe,
-    handleRecipeClick: dialog.openRecipe,
+    handleRecipeClick: modal.openRecipe,
     currentUserId: userId ?? null,
   };
 }

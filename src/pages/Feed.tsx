@@ -14,8 +14,8 @@ const Feed = () => {
     selectedCategory,
     setSelectedCategory,
     selectedRecipe,
-    isDialogOpen,
-    setIsDialogOpen,
+    isModalOpen,
+    setIsModalOpen,
     toggleLike,
     toggleSaveRecipe,
     handleRecipeClick,
@@ -45,8 +45,8 @@ const Feed = () => {
       />
 
       <FeedRecipeModal
-        open={isDialogOpen}
-        onOpenChange={setIsDialogOpen}
+        open={isModalOpen}
+        onOpenChange={setIsModalOpen}
         recipe={selectedRecipe}
         currentUserId={currentUserId}
         onToggleLike={toggleLike}
