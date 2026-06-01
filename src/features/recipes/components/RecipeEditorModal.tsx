@@ -2,22 +2,39 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Plus, Trash2, ShoppingCart, Globe, Lock, X, Image as ImageIcon } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { CATEGORY_OPTIONS } from "@/constants/categories";
-import { useRecipeForm } from "@/hooks/useRecipeForm";
+import { useRecipeForm } from "@/features/recipes/hooks/useRecipeForm";
 import type { Recipe } from "@/types/recipe";
 
-interface RecipeDialogProps {
+interface RecipeEditorModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   recipe: Recipe | null;
   onSuccess: () => void;
 }
 
-const RecipeDialog = ({ open, onOpenChange, recipe, onSuccess }: RecipeDialogProps) => {
+export function RecipeEditorModal({
+  open,
+  onOpenChange,
+  recipe,
+  onSuccess,
+}: RecipeEditorModalProps) {
   const {
     loading,
     uploadingImage,
@@ -79,9 +96,7 @@ const RecipeDialog = ({ open, onOpenChange, recipe, onSuccess }: RecipeDialogPro
                   <p className="text-sm text-muted-foreground mb-2">
                     Kliknite alebo presuňte obrázok sem
                   </p>
-                  <p className="text-xs text-muted-foreground">
-                    JPG, PNG alebo WEBP (max. 5MB)
-                  </p>
+                  <p className="text-xs text-muted-foreground">JPG, PNG alebo WEBP (max. 5MB)</p>
                 </div>
               )}
               <div className="flex gap-2">
@@ -142,11 +157,11 @@ const RecipeDialog = ({ open, onOpenChange, recipe, onSuccess }: RecipeDialogPro
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                    {CATEGORY_OPTIONS.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
+                  {CATEGORY_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -195,7 +210,9 @@ const RecipeDialog = ({ open, onOpenChange, recipe, onSuccess }: RecipeDialogPro
                     placeholder="Množstvo"
                     type="number"
                     value={ingredient.quantity || ""}
-                    onChange={(e) => updateIngredient(index, "quantity", parseFloat(e.target.value) || 0)}
+                    onChange={(e) =>
+                      updateIngredient(index, "quantity", parseFloat(e.target.value) || 0)
+                    }
                     className="flex-1"
                   />
                   <Input
@@ -241,8 +258,8 @@ const RecipeDialog = ({ open, onOpenChange, recipe, onSuccess }: RecipeDialogPro
                   {formData.is_public ? "Verejný recept" : "Súkromný recept"}
                 </Label>
                 <p className="text-sm text-muted-foreground">
-                  {formData.is_public 
-                    ? "Recept uvidia všetci používatelia" 
+                  {formData.is_public
+                    ? "Recept uvidia všetci používatelia"
                     : "Recept uvidíte len vy"}
                 </p>
               </div>
@@ -287,6 +304,4 @@ const RecipeDialog = ({ open, onOpenChange, recipe, onSuccess }: RecipeDialogPro
       </DialogContent>
     </Dialog>
   );
-};
-
-export default RecipeDialog;
+}

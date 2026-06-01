@@ -37,5 +37,3 @@ export function useFeedPage() {
     currentUserId: userId ?? null,
   };
 }
-
-export const useFeedRecipes = useFeedPage;

@@ -1,9 +1,16 @@
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { DEFAULT_CATEGORY, normalizeCategory } from "@/constants/categories";
 import { recipeSchema } from "@/lib/validations";
+import {
+  createRecipe,
+  deleteRecipe,
+  insertShoppingListItems,
+  updateRecipe,
+  updateRecipeImageUrl,
+  uploadRecipeImage,
+} from "../api/recipesRepository";
 import type { Recipe, Ingredient } from "@/types/recipe";
 
 interface UseRecipeFormOptions {
@@ -42,9 +49,11 @@ export function useRecipeForm({ recipe, open, onSuccess, onClose }: UseRecipeFor
         instructions: recipe.instructions,
         calories: recipe.calories?.toString() || "",
         notes: recipe.notes || "",
-        is_public: (recipe as any).is_public || false,
+        is_public: recipe.is_public ?? false,
       });
-      setIngredients(recipe.ingredients.length > 0 ? recipe.ingredients : [{ name: "", quantity: 0, unit: "" }]);
+      setIngredients(
+        recipe.ingredients.length > 0 ? recipe.ingredients : [{ name: "", quantity: 0, unit: "" }],
+      );
       setImagePreview(recipe.image_url || null);
       setImageFile(null);
     } else {
@@ -85,7 +94,7 @@ export function useRecipeForm({ recipe, open, onSuccess, onClose }: UseRecipeFor
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!file.type.startsWith('image/')) {
+    if (!file.type.startsWith("image/")) {
       toast({
         title: "Chyba",
         description: "Prosím vyberte obrázok (JPG, PNG alebo WEBP).",
@@ -121,61 +130,36 @@ export function useRecipeForm({ recipe, open, onSuccess, onClose }: UseRecipeFor
 
     setUploadingImage(true);
     try {
-      const fileExt = imageFile.name.split('.').pop();
-      const fileName = `${userId}/${recipeId || Date.now()}.${fileExt}`;
-      
-      if (recipeId) {
-        try {
-          const { data: oldFiles } = await supabase.storage
-            .from('recipe-images')
-            .list(`${userId}/`, { search: recipeId });
-          
-          if (oldFiles && oldFiles.length > 0) {
-            await supabase.storage
-              .from('recipe-images')
-              .remove(oldFiles.map(f => `${userId}/${f.name}`));
-          }
-        } catch (deleteError) {
-          console.warn('Error deleting old image:', deleteError);
-        }
-      }
+      const { publicUrl, error } = await uploadRecipeImage(userId, imageFile, recipeId);
 
-      const { error: uploadError } = await supabase.storage
-        .from('recipe-images')
-        .upload(fileName, imageFile, {
-          cacheControl: '3600',
-          upsert: true
-        });
-
-      if (uploadError) {
-        console.error('Upload error:', uploadError);
-        
-        if (uploadError.message.includes('not found') || uploadError.message.includes('Bucket') || uploadError.message.includes('bucket')) {
+      if (error) {
+        if (
+          error.message.includes("not found") ||
+          error.message.includes("Bucket") ||
+          error.message.includes("bucket")
+        ) {
           toast({
             title: "Bucket neexistuje alebo nie je dostupný",
-            description: `Bucket 'recipe-images' nebol nájdený. Skontrolujte: 1) Bucket je public, 2) RLS policies sú nastavené (Storage > Policies), 3) Ste prihlásený. Chyba: ${uploadError.message}`,
+            description: `Bucket 'recipe-images' nebol nájdený. Skontrolujte: 1) Bucket je public, 2) RLS policies sú nastavené (Storage > Policies), 3) Ste prihlásený. Chyba: ${error.message}`,
             variant: "destructive",
           });
         } else {
           toast({
             title: "Chyba pri nahrávaní",
-            description: uploadError.message || "Nepodarilo sa nahrať obrázok.",
+            description: error.message || "Nepodarilo sa nahrať obrázok.",
             variant: "destructive",
           });
         }
         return null;
       }
 
-      const { data } = supabase.storage
-        .from('recipe-images')
-        .getPublicUrl(fileName);
-
-      return data.publicUrl;
-    } catch (error: any) {
-      console.error('Upload error:', error);
+      return publicUrl;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Nepodarilo sa nahrať obrázok.";
+      console.error("Upload error:", error);
       toast({
         title: "Chyba pri nahrávaní",
-        description: error.message || "Nepodarilo sa nahrať obrázok.",
+        description: message,
         variant: "destructive",
       });
       return null;
@@ -183,6 +167,19 @@ export function useRecipeForm({ recipe, open, onSuccess, onClose }: UseRecipeFor
       setUploadingImage(false);
     }
   };
+
+  const buildRecipePayload = (userId: string, imageUrl: string | null) => ({
+    user_id: userId,
+    name: formData.name,
+    description: formData.description,
+    category: formData.category,
+    ingredients: ingredients.filter((item) => item.name),
+    instructions: formData.instructions,
+    calories: formData.calories ? parseInt(formData.calories, 10) : null,
+    notes: formData.notes,
+    is_public: formData.is_public,
+    image_url: imageUrl,
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -220,55 +217,49 @@ export function useRecipeForm({ recipe, open, onSuccess, onClose }: UseRecipeFor
       }
     }
 
-    const recipeData = {
-      user_id: user.id,
-      name: formData.name,
-      description: formData.description,
-      category: formData.category,
-      ingredients: ingredients.filter(i => i.name) as any,
-      instructions: formData.instructions,
-      calories: formData.calories ? parseInt(formData.calories) : null,
-      notes: formData.notes,
-      is_public: formData.is_public,
-      image_url: imageUrl,
-    };
+    const recipeData = buildRecipePayload(user.id, imageUrl);
 
-    let error;
-    let result;
     if (recipe) {
-      ({ error, data: result } = await supabase
-        .from("recipes")
-        .update(recipeData)
-        .eq("id", recipe.id)
-        .select()
-        .single());
-    } else {
-      ({ error, data: result } = await supabase.from("recipes").insert(recipeData).select().single());
-    }
+      const { error } = await updateRecipe(recipe.id, recipeData);
 
-    if (error) {
-      toast({
-        title: "Chyba",
-        description: error.message,
-        variant: "destructive",
-      });
-    } else {
-      if (!recipe && imageFile && result) {
-        const newImageUrl = await uploadImage(user.id, result.id);
-        if (newImageUrl) {
-          await supabase
-            .from("recipes")
-            .update({ image_url: newImageUrl })
-            .eq("id", result.id);
-        }
+      if (error) {
+        toast({
+          title: "Chyba",
+          description: error.message,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Recept aktualizovaný",
+          description: "Recept bol úspešne aktualizovaný.",
+        });
+        onSuccess();
+        onClose();
       }
+    } else {
+      const { error, data: result } = await createRecipe(recipeData);
 
-      toast({
-        title: recipe ? "Recept aktualizovaný" : "Recept vytvorený",
-        description: recipe ? "Recept bol úspešne aktualizovaný." : "Nový recept bol pridaný.",
-      });
-      onSuccess();
-      onClose();
+      if (error) {
+        toast({
+          title: "Chyba",
+          description: error.message,
+          variant: "destructive",
+        });
+      } else {
+        if (imageFile && result) {
+          const newImageUrl = await uploadImage(user.id, result.id);
+          if (newImageUrl) {
+            await updateRecipeImageUrl(result.id, newImageUrl);
+          }
+        }
+
+        toast({
+          title: "Recept vytvorený",
+          description: "Nový recept bol pridaný.",
+        });
+        onSuccess();
+        onClose();
+      }
     }
 
     setLoading(false);
@@ -278,7 +269,7 @@ export function useRecipeForm({ recipe, open, onSuccess, onClose }: UseRecipeFor
     if (!recipe) return;
     setLoading(true);
 
-    const { error } = await supabase.from("recipes").delete().eq("id", recipe.id);
+    const { error } = await deleteRecipe(recipe.id);
 
     if (error) {
       toast({
@@ -303,17 +294,17 @@ export function useRecipeForm({ recipe, open, onSuccess, onClose }: UseRecipeFor
     setLoading(true);
 
     const items = ingredients
-      .filter(i => i.name)
-      .map(i => ({
+      .filter((item) => item.name)
+      .map((item) => ({
         user_id: user.id,
-        item_name: i.name,
-        quantity: i.quantity || null,
-        unit: i.unit || null,
+        item_name: item.name,
+        quantity: item.quantity || null,
+        unit: item.unit || null,
         recipe_id: recipe.id,
         is_checked: false,
       }));
 
-    const { error } = await supabase.from("shopping_list").insert(items);
+    const { error } = await insertShoppingListItems(items);
 
     if (error) {
       toast({

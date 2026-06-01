@@ -3,10 +3,12 @@ import { useToast } from "@/hooks/use-toast";
 import type { FeedRecipe } from "@/types/recipe";
 import {
   deleteRecipeLike,
-  deleteSavedRecipe,
   insertRecipeLike,
-  insertSavedRecipe,
 } from "../api/feedRepository";
+import {
+  deleteSavedRecipe,
+  insertSavedRecipe,
+} from "@/shared/api/savedRecipesRepository";
 
 interface UseFeedMutationsOptions {
   userId: string | undefined;

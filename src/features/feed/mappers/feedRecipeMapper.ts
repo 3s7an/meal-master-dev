@@ -1,21 +1,7 @@
 import { normalizeCategory } from "@/constants/categories";
-import type { FeedRecipe, Ingredient } from "@/types/recipe";
-import type { Json } from "@/integrations/supabase/types";
+import { parseIngredients } from "@/lib/parseIngredients";
+import type { FeedRecipe } from "@/types/recipe";
 import type { PublicRecipeRow, RecipeLikeRow } from "../api/feedRepository";
-
-function parseIngredients(raw: Json): Ingredient[] {
-  if (!Array.isArray(raw)) {
-    return [];
-  }
-
-  return raw
-    .filter((item): item is Record<string, unknown> => typeof item === "object" && item !== null)
-    .map((item) => ({
-      name: String(item.name ?? ""),
-      quantity: Number(item.quantity) || 0,
-      unit: String(item.unit ?? ""),
-    }));
-}
 
 export interface FeedRecipeMapperContext {
   userId: string;
