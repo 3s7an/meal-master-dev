@@ -2,7 +2,7 @@ import { useRecipesPage } from "@/features/recipes/hooks/useRecipesPage";
 import { RecipeEditorModal } from "@/features/recipes/components/RecipeEditorModal";
 import { RecipeSavedModal } from "@/features/recipes/components/RecipeSavedModal";
 import { RecipesBanner } from "@/features/recipes/components/RecipesBanner";
-import { RecipesCategoryFilter } from "@/features/recipes/components/RecipesCategoryFilter";
+import { CategoryFilter } from "@/components/CategoryFilter";
 import { RecipesRecipeGrid } from "@/features/recipes/components/RecipesRecipeGrid";
 import { RecipesSearch } from "@/features/recipes/components/RecipesSearch";
 
@@ -32,7 +32,7 @@ const Recipes = () => {
       <RecipesBanner onAddNew={handleAddNew} />
 
       <div className="flex flex-col gap-6">
-        <RecipesCategoryFilter
+        <CategoryFilter
           selectedCategory={selectedCategory}
           onSelectCategory={setSelectedCategory}
         />

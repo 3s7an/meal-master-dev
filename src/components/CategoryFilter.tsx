@@ -1,14 +1,11 @@
 import { CATEGORY_OPTIONS, getCategoryImagePath } from "@/constants/categories";
 
-interface FeedCategoryFilterProps {
+interface CategoryFilterProps {
   selectedCategory: string | null;
   onSelectCategory: (category: string | null) => void;
 }
 
-export function FeedCategoryFilter({
-  selectedCategory,
-  onSelectCategory,
-}: FeedCategoryFilterProps) {
+export function CategoryFilter({ selectedCategory, onSelectCategory }: CategoryFilterProps) {
   return (
     <div className="flex gap-4 flex-wrap items-center justify-center">
       <button

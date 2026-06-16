@@ -1,6 +1,6 @@
 import { useFeedPage } from "@/features/feed/hooks/useFeedPage";
 import { FeedBanner } from "@/features/feed/components/FeedBanner";
-import { FeedCategoryFilter } from "@/features/feed/components/FeedCategoryFilter";
+import { CategoryFilter } from "@/components/CategoryFilter";
 import { FeedRecipeModal } from "@/features/feed/components/FeedRecipeModal";
 import { FeedRecipeGrid } from "@/features/feed/components/FeedRecipeGrid";
 import { FeedSearch } from "@/features/feed/components/FeedSearch";
@@ -27,7 +27,7 @@ const Feed = () => {
       <FeedBanner />
 
       <div className="flex flex-col gap-6">
-        <FeedCategoryFilter
+        <CategoryFilter
           selectedCategory={selectedCategory}
           onSelectCategory={setSelectedCategory}
         />
