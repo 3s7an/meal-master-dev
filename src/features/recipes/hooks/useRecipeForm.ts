@@ -9,9 +9,9 @@ import {
   insertShoppingListItems,
   updateRecipe,
   updateRecipeImageUrl,
-  uploadRecipeImage,
 } from "../api/recipesRepository";
 import type { Recipe, Ingredient } from "@/types/recipe";
+import { useRecipeImage } from "./useRecipeImage";
 
 interface UseRecipeFormOptions {
   recipe: Recipe | null;
@@ -36,9 +36,7 @@ export function useRecipeForm({ recipe, open, onSuccess, onClose }: UseRecipeFor
   const [ingredients, setIngredients] = useState<Ingredient[]>([
     { name: "", quantity: 0, unit: "" },
   ]);
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [uploadingImage, setUploadingImage] = useState(false);
+  const image = useRecipeImage();
 
   useEffect(() => {
     if (recipe) {
@@ -54,8 +52,7 @@ export function useRecipeForm({ recipe, open, onSuccess, onClose }: UseRecipeFor
       setIngredients(
         recipe.ingredients.length > 0 ? recipe.ingredients : [{ name: "", quantity: 0, unit: "" }],
       );
-      setImagePreview(recipe.image_url || null);
-      setImageFile(null);
+      image.loadImage(recipe.image_url || null);
     } else {
       resetForm();
     }
@@ -72,8 +69,7 @@ export function useRecipeForm({ recipe, open, onSuccess, onClose }: UseRecipeFor
       is_public: false,
     });
     setIngredients([{ name: "", quantity: 0, unit: "" }]);
-    setImageFile(null);
-    setImagePreview(null);
+    image.removeImage();
   };
 
   const addIngredient = () => {
@@ -88,84 +84,6 @@ export function useRecipeForm({ recipe, open, onSuccess, onClose }: UseRecipeFor
     const updated = [...ingredients];
     updated[index] = { ...updated[index], [field]: value };
     setIngredients(updated);
-  };
-
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (!file.type.startsWith("image/")) {
-      toast({
-        title: "Chyba",
-        description: "Prosím vyberte obrázok (JPG, PNG alebo WEBP).",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (file.size > 5 * 1024 * 1024) {
-      toast({
-        title: "Chyba",
-        description: "Obrázok je príliš veľký. Maximálna veľkosť je 5MB.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setImageFile(file);
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setImagePreview(reader.result as string);
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const removeImage = () => {
-    setImageFile(null);
-    setImagePreview(null);
-  };
-
-  const uploadImage = async (userId: string, recipeId?: string): Promise<string | null> => {
-    if (!imageFile) return null;
-
-    setUploadingImage(true);
-    try {
-      const { publicUrl, error } = await uploadRecipeImage(userId, imageFile, recipeId);
-
-      if (error) {
-        if (
-          error.message.includes("not found") ||
-          error.message.includes("Bucket") ||
-          error.message.includes("bucket")
-        ) {
-          toast({
-            title: "Bucket neexistuje alebo nie je dostupný",
-            description: `Bucket 'recipe-images' nebol nájdený. Skontrolujte: 1) Bucket je public, 2) RLS policies sú nastavené (Storage > Policies), 3) Ste prihlásený. Chyba: ${error.message}`,
-            variant: "destructive",
-          });
-        } else {
-          toast({
-            title: "Chyba pri nahrávaní",
-            description: error.message || "Nepodarilo sa nahrať obrázok.",
-            variant: "destructive",
-          });
-        }
-        return null;
-      }
-
-      return publicUrl;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Nepodarilo sa nahrať obrázok.";
-      console.error("Upload error:", error);
-      toast({
-        title: "Chyba pri nahrávaní",
-        description: message,
-        variant: "destructive",
-      });
-      return null;
-    } finally {
-      setUploadingImage(false);
-    }
   };
 
   const buildRecipePayload = (userId: string, imageUrl: string | null) => ({
@@ -207,8 +125,8 @@ export function useRecipeForm({ recipe, open, onSuccess, onClose }: UseRecipeFor
     }
 
     let imageUrl = recipe?.image_url || null;
-    if (imageFile) {
-      const uploadedUrl = await uploadImage(user.id, recipe?.id);
+    if (image.imageFile) {
+      const uploadedUrl = await image.uploadImage(user.id, recipe?.id);
       if (uploadedUrl) {
         imageUrl = uploadedUrl;
       } else {
@@ -223,16 +141,9 @@ export function useRecipeForm({ recipe, open, onSuccess, onClose }: UseRecipeFor
       const { error } = await updateRecipe(recipe.id, recipeData);
 
       if (error) {
-        toast({
-          title: "Chyba",
-          description: error.message,
-          variant: "destructive",
-        });
+        toast({ title: "Chyba", description: error.message, variant: "destructive" });
       } else {
-        toast({
-          title: "Recept aktualizovaný",
-          description: "Recept bol úspešne aktualizovaný.",
-        });
+        toast({ title: "Recept aktualizovaný", description: "Recept bol úspešne aktualizovaný." });
         onSuccess();
         onClose();
       }
@@ -240,23 +151,16 @@ export function useRecipeForm({ recipe, open, onSuccess, onClose }: UseRecipeFor
       const { error, data: result } = await createRecipe(recipeData);
 
       if (error) {
-        toast({
-          title: "Chyba",
-          description: error.message,
-          variant: "destructive",
-        });
+        toast({ title: "Chyba", description: error.message, variant: "destructive" });
       } else {
-        if (imageFile && result) {
-          const newImageUrl = await uploadImage(user.id, result.id);
+        if (image.imageFile && result) {
+          const newImageUrl = await image.uploadImage(user.id, result.id);
           if (newImageUrl) {
             await updateRecipeImageUrl(result.id, newImageUrl);
           }
         }
 
-        toast({
-          title: "Recept vytvorený",
-          description: "Nový recept bol pridaný.",
-        });
+        toast({ title: "Recept vytvorený", description: "Nový recept bol pridaný." });
         onSuccess();
         onClose();
       }
@@ -272,16 +176,9 @@ export function useRecipeForm({ recipe, open, onSuccess, onClose }: UseRecipeFor
     const { error } = await deleteRecipe(recipe.id);
 
     if (error) {
-      toast({
-        title: "Chyba",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast({ title: "Chyba", description: error.message, variant: "destructive" });
     } else {
-      toast({
-        title: "Recept odstránený",
-        description: "Recept bol úspešne odstránený.",
-      });
+      toast({ title: "Recept odstránený", description: "Recept bol úspešne odstránený." });
       onSuccess();
       onClose();
     }
@@ -307,11 +204,7 @@ export function useRecipeForm({ recipe, open, onSuccess, onClose }: UseRecipeFor
     const { error } = await insertShoppingListItems(items);
 
     if (error) {
-      toast({
-        title: "Chyba",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast({ title: "Chyba", description: error.message, variant: "destructive" });
     } else {
       toast({
         title: "Pridané do zoznamu",
@@ -324,17 +217,17 @@ export function useRecipeForm({ recipe, open, onSuccess, onClose }: UseRecipeFor
 
   return {
     loading,
-    uploadingImage,
+    uploadingImage: image.uploadingImage,
     formData,
     setFormData,
     ingredients,
-    imagePreview,
-    imageFile,
+    imagePreview: image.imagePreview,
+    imageFile: image.imageFile,
     addIngredient,
     removeIngredient,
     updateIngredient,
-    handleImageChange,
-    removeImage,
+    handleImageChange: image.handleImageChange,
+    removeImage: image.removeImage,
     handleSubmit,
     handleDelete,
     addToShoppingList,
