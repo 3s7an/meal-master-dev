@@ -1,5 +1,5 @@
 import type { MouseEvent } from "react";
-import { Card, CardContent } from "@/components/ui/card";
+import { RecipeGrid } from "@/components/RecipeGrid";
 import type { FeedRecipe } from "@/types/recipe";
 import { FeedRecipeCard } from "./FeedRecipeCard";
 
@@ -22,31 +22,14 @@ export function FeedRecipeGrid({
   onOpenRecipe,
   onToggleLike,
 }: FeedRecipeGridProps) {
-  if (loading) {
-    return (
-      <div className="text-center py-12">
-        <p className="text-muted-foreground">Načítavam recepty...</p>
-      </div>
-    );
-  }
-
-  if (recipes.length === 0) {
-    return (
-      <Card className="text-center py-12">
-        <CardContent className="pt-6">
-          <p className="text-muted-foreground mb-4">
-            {searchTerm || selectedCategory
-              ? "Nenašli sa žiadne recepty zodpovedajúce filtrom."
-              : "Zatiaľ nie sú žiadne verejné recepty."}
-          </p>
-        </CardContent>
-      </Card>
-    );
-  }
-
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      {recipes.map((recipe) => (
+    <RecipeGrid
+      recipes={recipes}
+      loading={loading}
+      searchTerm={searchTerm}
+      selectedCategory={selectedCategory}
+      emptyState={<p className="text-muted-foreground mb-4">Zatiaľ nie sú žiadne verejné recepty.</p>}
+      renderCard={(recipe) => (
         <FeedRecipeCard
           key={recipe.id}
           recipe={recipe}
@@ -54,7 +37,7 @@ export function FeedRecipeGrid({
           onOpenRecipe={onOpenRecipe}
           onToggleLike={onToggleLike}
         />
-      ))}
-    </div>
+      )}
+    />
   );
 }
