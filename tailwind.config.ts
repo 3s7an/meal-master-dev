@@ -10,10 +10,13 @@ export default {
       center: true,
       padding: "2rem",
       screens: {
-        "2xl": "1400px",
+        "2xl": "1600px",
       },
     },
     extend: {
+      fontFamily: {
+        sans: ["var(--font-sans)", "sans-serif"],
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
@@ -60,9 +63,18 @@ export default {
         },
       },
       borderRadius: {
-        lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
+        sm: "var(--radius-sm)",
+        md: "var(--radius-md)",
+        lg: "var(--radius-lg)",
+        "2xl": "var(--radius-2xl)",
+        full: "var(--radius-full)",
+      },
+      boxShadow: {
+        card: "var(--shadow-sm)",
+        "card-hover": "var(--shadow-xl)",
+        "card-primary": "var(--card-shadow)",
+        banner: "var(--shadow-banner)",
+        badge: "var(--shadow-badge)",
       },
       keyframes: {
         "accordion-down": {

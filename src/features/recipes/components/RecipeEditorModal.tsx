@@ -62,7 +62,7 @@ export function RecipeEditorModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{recipe ? "Upraviť recept" : "Nový recept"}</DialogTitle>
           <DialogDescription>
@@ -71,61 +71,70 @@ export function RecipeEditorModal({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          <RecipeImageUpload
-            imagePreview={imagePreview}
-            imageFile={imageFile}
-            uploadingImage={uploadingImage}
-            loading={loading}
-            onImageChange={handleImageChange}
-            onRemoveImage={removeImage}
-          />
-
-          <div className="space-y-2">
-            <Label htmlFor="name">Názov receptu *</Label>
-            <Input
-              id="name"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              required
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <RecipeImageUpload
+              imagePreview={imagePreview}
+              imageFile={imageFile}
+              uploadingImage={uploadingImage}
+              loading={loading}
+              onImageChange={handleImageChange}
+              onRemoveImage={removeImage}
             />
-          </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="description">Popis</Label>
-            <Textarea
-              id="description"
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              rows={2}
-            />
-          </div>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="name">Názov receptu *</Label>
+                <Input
+                  id="name"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  required
+                />
+              </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="category">Kategória *</Label>
-              <Select
-                value={formData.category}
-                onValueChange={(value) => setFormData({ ...formData, category: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {CATEGORY_OPTIONS.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="calories">Kalórie</Label>
-              <Input
-                id="calories"
-                type="number"
-                value={formData.calories}
-                onChange={(e) => setFormData({ ...formData, calories: e.target.value })}
+              <div className="space-y-2">
+                <Label htmlFor="description">Popis</Label>
+                <Textarea
+                  id="description"
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  rows={3}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="category">Kategória *</Label>
+                  <Select
+                    value={formData.category}
+                    onValueChange={(value) => setFormData({ ...formData, category: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CATEGORY_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="calories">Kalórie</Label>
+                  <Input
+                    id="calories"
+                    type="number"
+                    value={formData.calories}
+                    onChange={(e) => setFormData({ ...formData, calories: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <RecipeVisibilityToggle
+                isPublic={formData.is_public}
+                onChange={(checked) => setFormData({ ...formData, is_public: checked })}
               />
             </div>
           </div>
@@ -137,30 +146,27 @@ export function RecipeEditorModal({
             onUpdate={updateIngredient}
           />
 
-          <div className="space-y-2">
-            <Label htmlFor="instructions">Postup prípravy</Label>
-            <Textarea
-              id="instructions"
-              value={formData.instructions}
-              onChange={(e) => setFormData({ ...formData, instructions: e.target.value })}
-              rows={4}
-            />
-          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <Label htmlFor="instructions">Postup prípravy</Label>
+              <Textarea
+                id="instructions"
+                value={formData.instructions}
+                onChange={(e) => setFormData({ ...formData, instructions: e.target.value })}
+                rows={5}
+              />
+            </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="notes">Poznámky</Label>
-            <Textarea
-              id="notes"
-              value={formData.notes}
-              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              rows={2}
-            />
+            <div className="space-y-2">
+              <Label htmlFor="notes">Poznámky</Label>
+              <Textarea
+                id="notes"
+                value={formData.notes}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                rows={5}
+              />
+            </div>
           </div>
-
-          <RecipeVisibilityToggle
-            isPublic={formData.is_public}
-            onChange={(checked) => setFormData({ ...formData, is_public: checked })}
-          />
 
           <div className="flex gap-2 justify-between">
             <div className="flex gap-2">
