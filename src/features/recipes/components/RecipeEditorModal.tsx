@@ -1,3 +1,4 @@
+import { ShoppingCart, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,11 +17,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Trash2, ShoppingCart, Globe, Lock, X, Image as ImageIcon } from "lucide-react";
-import { Switch } from "@/components/ui/switch";
 import { CATEGORY_OPTIONS } from "@/constants/categories";
 import { useRecipeForm } from "@/features/recipes/hooks/useRecipeForm";
 import type { Recipe } from "@/types/recipe";
+import { RecipeImageUpload } from "./RecipeImageUpload";
+import { RecipeIngredientsForm } from "./RecipeIngredientsForm";
+import { RecipeVisibilityToggle } from "./RecipeVisibilityToggle";
 
 interface RecipeEditorModalProps {
   open: boolean;
@@ -69,62 +71,14 @@ export function RecipeEditorModal({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="space-y-2">
-            <Label htmlFor="image">Fotka receptu</Label>
-            <div className="space-y-3">
-              {imagePreview ? (
-                <div className="relative">
-                  <img
-                    src={imagePreview}
-                    alt="Preview"
-                    className="w-full h-64 md:h-80 object-cover rounded-lg border"
-                  />
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    size="icon"
-                    className="absolute top-2 right-2"
-                    onClick={removeImage}
-                    disabled={uploadingImage || loading}
-                  >
-                    <X className="w-4 h-4" />
-                  </Button>
-                </div>
-              ) : (
-                <div className="border-2 border-dashed rounded-lg p-6 text-center">
-                  <ImageIcon className="w-12 h-12 mx-auto text-muted-foreground mb-2" />
-                  <p className="text-sm text-muted-foreground mb-2">
-                    Kliknite alebo presuňte obrázok sem
-                  </p>
-                  <p className="text-xs text-muted-foreground">JPG, PNG alebo WEBP (max. 5MB)</p>
-                </div>
-              )}
-              <div className="flex gap-2">
-                <Input
-                  id="image"
-                  type="file"
-                  accept="image/jpeg,image/jpg,image/png,image/webp"
-                  onChange={handleImageChange}
-                  disabled={uploadingImage || loading}
-                  className="cursor-pointer"
-                />
-                {imagePreview && !imageFile && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={removeImage}
-                    disabled={uploadingImage || loading}
-                  >
-                    <X className="w-4 h-4 mr-2" />
-                    Odstrániť
-                  </Button>
-                )}
-              </div>
-              {uploadingImage && (
-                <p className="text-sm text-muted-foreground">Nahrávam obrázok...</p>
-              )}
-            </div>
-          </div>
+          <RecipeImageUpload
+            imagePreview={imagePreview}
+            imageFile={imageFile}
+            uploadingImage={uploadingImage}
+            loading={loading}
+            onImageChange={handleImageChange}
+            onRemoveImage={removeImage}
+          />
 
           <div className="space-y-2">
             <Label htmlFor="name">Názov receptu *</Label>
@@ -165,7 +119,6 @@ export function RecipeEditorModal({
                 </SelectContent>
               </Select>
             </div>
-
             <div className="space-y-2">
               <Label htmlFor="calories">Kalórie</Label>
               <Input
@@ -177,54 +130,12 @@ export function RecipeEditorModal({
             </div>
           </div>
 
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <Label>Ingrediencie *</Label>
-              <Button type="button" variant="outline" size="sm" onClick={addIngredient}>
-                <Plus className="w-4 h-4 mr-1" />
-                Pridať
-              </Button>
-            </div>
-            {ingredients.map((ingredient, index) => (
-              <div key={index} className="space-y-2 border rounded-lg p-3">
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="Názov ingrediencie"
-                    value={ingredient.name}
-                    onChange={(e) => updateIngredient(index, "name", e.target.value)}
-                    className="flex-1 min-w-0"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => removeIngredient(index)}
-                    disabled={ingredients.length === 1}
-                    className="shrink-0"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="Množstvo"
-                    type="number"
-                    value={ingredient.quantity || ""}
-                    onChange={(e) =>
-                      updateIngredient(index, "quantity", parseFloat(e.target.value) || 0)
-                    }
-                    className="flex-1"
-                  />
-                  <Input
-                    placeholder="Jednotka"
-                    value={ingredient.unit}
-                    onChange={(e) => updateIngredient(index, "unit", e.target.value)}
-                    className="flex-1"
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
+          <RecipeIngredientsForm
+            ingredients={ingredients}
+            onAdd={addIngredient}
+            onRemove={removeIngredient}
+            onUpdate={updateIngredient}
+          />
 
           <div className="space-y-2">
             <Label htmlFor="instructions">Postup prípravy</Label>
@@ -246,30 +157,10 @@ export function RecipeEditorModal({
             />
           </div>
 
-          <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/50">
-            <div className="flex items-center gap-3">
-              {formData.is_public ? (
-                <Globe className="w-5 h-5 text-primary" />
-              ) : (
-                <Lock className="w-5 h-5 text-muted-foreground" />
-              )}
-              <div>
-                <Label htmlFor="is_public" className="cursor-pointer">
-                  {formData.is_public ? "Verejný recept" : "Súkromný recept"}
-                </Label>
-                <p className="text-sm text-muted-foreground">
-                  {formData.is_public
-                    ? "Recept uvidia všetci používatelia"
-                    : "Recept uvidíte len vy"}
-                </p>
-              </div>
-            </div>
-            <Switch
-              id="is_public"
-              checked={formData.is_public}
-              onCheckedChange={(checked) => setFormData({ ...formData, is_public: checked })}
-            />
-          </div>
+          <RecipeVisibilityToggle
+            isPublic={formData.is_public}
+            onChange={(checked) => setFormData({ ...formData, is_public: checked })}
+          />
 
           <div className="flex gap-2 justify-between">
             <div className="flex gap-2">
