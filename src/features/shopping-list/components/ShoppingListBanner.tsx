@@ -1,31 +1,13 @@
-import {
-  CheckSquare,
-  Download,
-  Plus,
-  Search,
-  Square,
-  Trash2,
-  X,
-} from "lucide-react";
+import { CheckSquare, Download, Square, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
-import type { ShoppingItem } from "@/types/shoppingList";
 
-interface ShoppingListBannerProps {
-  isAuthenticated: boolean;
-  selectionMode: boolean;
-  selectedCount: number;
-  itemsCount: number;
-  hasCheckedItems: boolean;
+interface SelectionActionsProps {
   allSelected: boolean;
-  onExport: () => void;
-  onClearChecked: () => void;
-  onEnterSelectionMode: () => void;
+  selectedCount: number;
   onToggleSelectAll: () => void;
   onDeleteSelected: () => void;
   onExitSelectionMode: () => void;
+  className?: string;
 }
 
 function SelectionActions({
@@ -35,14 +17,7 @@ function SelectionActions({
   onDeleteSelected,
   onExitSelectionMode,
   className,
-}: {
-  allSelected: boolean;
-  selectedCount: number;
-  onToggleSelectAll: () => void;
-  onDeleteSelected: () => void;
-  onExitSelectionMode: () => void;
-  className?: string;
-}) {
+}: SelectionActionsProps) {
   return (
     <div className={className}>
       <Button
@@ -83,6 +58,15 @@ function SelectionActions({
   );
 }
 
+interface DefaultActionsProps {
+  itemsCount: number;
+  hasCheckedItems: boolean;
+  onExport: () => void;
+  onClearChecked: () => void;
+  onEnterSelectionMode: () => void;
+  className?: string;
+}
+
 function DefaultActions({
   itemsCount,
   hasCheckedItems,
@@ -90,14 +74,7 @@ function DefaultActions({
   onClearChecked,
   onEnterSelectionMode,
   className,
-}: {
-  itemsCount: number;
-  hasCheckedItems: boolean;
-  onExport: () => void;
-  onClearChecked: () => void;
-  onEnterSelectionMode: () => void;
-  className?: string;
-}) {
+}: DefaultActionsProps) {
   return (
     <div className={className}>
       <Button
@@ -129,6 +106,21 @@ function DefaultActions({
       </Button>
     </div>
   );
+}
+
+interface ShoppingListBannerProps {
+  isAuthenticated: boolean;
+  selectionMode: boolean;
+  selectedCount: number;
+  itemsCount: number;
+  hasCheckedItems: boolean;
+  allSelected: boolean;
+  onExport: () => void;
+  onClearChecked: () => void;
+  onEnterSelectionMode: () => void;
+  onToggleSelectAll: () => void;
+  onDeleteSelected: () => void;
+  onExitSelectionMode: () => void;
 }
 
 export function ShoppingListBanner({
@@ -234,200 +226,5 @@ export function ShoppingListBanner({
         </div>
       )}
     </>
-  );
-}
-
-interface ShoppingListAddItemProps {
-  newItemName: string;
-  onNameChange: (name: string) => void;
-  onAdd: () => void;
-}
-
-export function ShoppingListAddItem({ newItemName, onNameChange, onAdd }: ShoppingListAddItemProps) {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Pridať položku</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="flex gap-2">
-          <Input
-            placeholder="Názov položky"
-            value={newItemName}
-            onChange={(e) => onNameChange(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && onAdd()}
-            className="flex-1 min-w-0"
-          />
-          <Button onClick={onAdd} size="icon" className="shrink-0">
-            <Plus className="w-5 h-5" />
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-interface ShoppingListSearchProps {
-  searchTerm: string;
-  onSearchTermChange: (value: string) => void;
-}
-
-export function ShoppingListSearch({ searchTerm, onSearchTermChange }: ShoppingListSearchProps) {
-  return (
-    <Card>
-      <CardContent className="p-4">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-          <Input
-            placeholder="Hľadať položky..."
-            value={searchTerm}
-            onChange={(e) => onSearchTermChange(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-interface ShoppingListItemRowProps {
-  item: ShoppingItem;
-  selectionMode: boolean;
-  isSelected: boolean;
-  onToggleSelection: (itemId: string) => void;
-  onToggleChecked: (itemId: string, checked: boolean) => void;
-  onDelete: (itemId: string) => void;
-}
-
-function ShoppingListItemRow({
-  item,
-  selectionMode,
-  isSelected,
-  onToggleSelection,
-  onToggleChecked,
-  onDelete,
-}: ShoppingListItemRowProps) {
-  return (
-    <Card
-      className={`transition-all duration-300 ease-in-out ${
-        selectionMode && isSelected
-          ? "border-primary bg-primary/5"
-          : item.is_checked && !selectionMode
-            ? "opacity-75"
-            : ""
-      }`}
-    >
-      <CardContent className="flex items-center gap-4 p-4">
-        {selectionMode ? (
-          <Checkbox checked={isSelected} onCheckedChange={() => onToggleSelection(item.id)} />
-        ) : (
-          <Checkbox
-            checked={item.is_checked}
-            onCheckedChange={(checked) => onToggleChecked(item.id, !!checked)}
-          />
-        )}
-        <div
-          className={`flex-1 transition-all duration-300 ease-in-out ${
-            item.is_checked && !selectionMode
-              ? "line-through text-muted-foreground opacity-60"
-              : "opacity-100"
-          }`}
-        >
-          <span className="font-medium transition-all duration-300">{item.item_name}</span>
-          {(item.quantity != null || item.unit) && (
-            <span className="text-muted-foreground ml-2 transition-all duration-300">
-              {item.unit ? `(${item.unit})` : item.quantity != null ? `(${item.quantity})` : ""}
-            </span>
-          )}
-        </div>
-        {!selectionMode && (
-          <Button variant="ghost" size="icon" onClick={() => onDelete(item.id)}>
-            <Trash2 className="w-4 h-4" />
-          </Button>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-interface ShoppingListItemsProps {
-  items: ShoppingItem[];
-  filteredItems: ShoppingItem[];
-  loading: boolean;
-  isAuthenticated: boolean;
-  selectionMode: boolean;
-  selectedItems: Set<string>;
-  onToggleSelection: (itemId: string) => void;
-  onToggleChecked: (itemId: string, checked: boolean) => void;
-  onDelete: (itemId: string) => void;
-}
-
-export function ShoppingListItems({
-  items,
-  filteredItems,
-  loading,
-  isAuthenticated,
-  selectionMode,
-  selectedItems,
-  onToggleSelection,
-  onToggleChecked,
-  onDelete,
-}: ShoppingListItemsProps) {
-  if (!isAuthenticated) {
-    return (
-      <Card className="text-center py-12">
-        <CardContent>
-          <p className="text-muted-foreground">
-            Musíte byť prihlásený, aby ste mohli zobraziť nákupný zoznam.
-          </p>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (loading) {
-    return (
-      <div className="text-center py-12">
-        <p className="text-muted-foreground">Načítavam zoznam...</p>
-      </div>
-    );
-  }
-
-  if (items.length === 0) {
-    return (
-      <Card className="text-center py-12">
-        <CardContent>
-          <p className="text-muted-foreground">Váš nákupný zoznam je prázdny</p>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (filteredItems.length === 0) {
-    return (
-      <Card className="text-center py-12">
-        <CardContent>
-          <p className="text-muted-foreground">
-            Nenašli sa žiadne položky zodpovedajúce vyhľadávaniu
-          </p>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  return (
-    <div className="space-y-2">
-      {filteredItems.map((item) => (
-        <ShoppingListItemRow
-          key={item.id}
-          item={item}
-          selectionMode={selectionMode}
-          isSelected={selectedItems.has(item.id)}
-          onToggleSelection={onToggleSelection}
-          onToggleChecked={onToggleChecked}
-          onDelete={onDelete}
-        />
-      ))}
-    </div>
   );
 }

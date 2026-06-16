@@ -1,9 +1,7 @@
-import {
-  ShoppingListAddItem,
-  ShoppingListBanner,
-  ShoppingListItems,
-  ShoppingListSearch,
-} from "@/features/shopping-list/components/ShoppingListContent";
+import { ShoppingListBanner } from "@/features/shopping-list/components/ShoppingListBanner";
+import { ShoppingListAddItem } from "@/features/shopping-list/components/ShoppingListAddItem";
+import { ShoppingListSearch } from "@/features/shopping-list/components/ShoppingListSearch";
+import { ShoppingListItems } from "@/features/shopping-list/components/ShoppingListItems";
 import { useShoppingListPage } from "@/features/shopping-list/hooks/useShoppingListPage";
 
 const ShoppingList = () => {
