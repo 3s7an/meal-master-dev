@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { DEFAULT_CATEGORY, normalizeCategory } from "@/constants/categories";
@@ -36,7 +36,21 @@ export function useRecipeForm({ recipe, open, onSuccess, onClose }: UseRecipeFor
   const [ingredients, setIngredients] = useState<Ingredient[]>([
     { name: "", quantity: 0, unit: "" },
   ]);
-  const image = useRecipeImage();
+  const { imageFile, imagePreview, uploadingImage, handleImageChange, removeImage, loadImage, uploadImage } = useRecipeImage();
+
+  const resetForm = useCallback(() => {
+    setFormData({
+      name: "",
+      description: "",
+      category: DEFAULT_CATEGORY,
+      instructions: "",
+      calories: "",
+      notes: "",
+      is_public: false,
+    });
+    setIngredients([{ name: "", quantity: 0, unit: "" }]);
+    removeImage();
+  }, [removeImage]);
 
   useEffect(() => {
     if (recipe) {
@@ -52,25 +66,11 @@ export function useRecipeForm({ recipe, open, onSuccess, onClose }: UseRecipeFor
       setIngredients(
         recipe.ingredients.length > 0 ? recipe.ingredients : [{ name: "", quantity: 0, unit: "" }],
       );
-      image.loadImage(recipe.image_url || null);
+      loadImage(recipe.image_url || null);
     } else {
       resetForm();
     }
-  }, [recipe, open]);
-
-  const resetForm = () => {
-    setFormData({
-      name: "",
-      description: "",
-      category: DEFAULT_CATEGORY,
-      instructions: "",
-      calories: "",
-      notes: "",
-      is_public: false,
-    });
-    setIngredients([{ name: "", quantity: 0, unit: "" }]);
-    image.removeImage();
-  };
+  }, [recipe, open, loadImage, resetForm]);
 
   const addIngredient = () => {
     setIngredients([...ingredients, { name: "", quantity: 0, unit: "" }]);
@@ -125,8 +125,8 @@ export function useRecipeForm({ recipe, open, onSuccess, onClose }: UseRecipeFor
     }
 
     let imageUrl = recipe?.image_url || null;
-    if (image.imageFile) {
-      const uploadedUrl = await image.uploadImage(user.id, recipe?.id);
+    if (imageFile) {
+      const uploadedUrl = await uploadImage(user.id, recipe?.id);
       if (uploadedUrl) {
         imageUrl = uploadedUrl;
       } else {
@@ -153,8 +153,8 @@ export function useRecipeForm({ recipe, open, onSuccess, onClose }: UseRecipeFor
       if (error) {
         toast({ title: "Chyba", description: error.message, variant: "destructive" });
       } else {
-        if (image.imageFile && result) {
-          const newImageUrl = await image.uploadImage(user.id, result.id);
+        if (imageFile && result) {
+          const newImageUrl = await uploadImage(user.id, result.id);
           if (newImageUrl) {
             await updateRecipeImageUrl(result.id, newImageUrl);
           }
@@ -217,17 +217,17 @@ export function useRecipeForm({ recipe, open, onSuccess, onClose }: UseRecipeFor
 
   return {
     loading,
-    uploadingImage: image.uploadingImage,
+    uploadingImage: uploadingImage,
     formData,
     setFormData,
     ingredients,
-    imagePreview: image.imagePreview,
-    imageFile: image.imageFile,
+    imagePreview: imagePreview,
+    imageFile: imageFile,
     addIngredient,
     removeIngredient,
     updateIngredient,
-    handleImageChange: image.handleImageChange,
-    removeImage: image.removeImage,
+    handleImageChange: handleImageChange,
+    removeImage: removeImage,
     handleSubmit,
     handleDelete,
     addToShoppingList,

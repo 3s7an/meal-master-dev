@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { uploadRecipeImage } from "../api/recipesRepository";
 
@@ -38,16 +38,16 @@ export function useRecipeImage() {
     reader.readAsDataURL(file);
   };
 
-  const removeImage = () => {
+  const removeImage = useCallback(() => {
     setImageFile(null);
     setImagePreview(null);
-  };
+  }, []);
 
   // Načíta existujúci URL pri otvorení receptu — zruší prípadný nový súbor
-  const loadImage = (url: string | null) => {
+  const loadImage = useCallback((url: string | null) => {
     setImagePreview(url);
     setImageFile(null);
-  };
+  }, []);
 
   const uploadImage = async (userId: string, recipeId?: string): Promise<string | null> => {
     if (!imageFile) return null;
